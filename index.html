@@ -11608,16 +11608,13 @@ async function pgClub(app) {
       ? `${e(f.label)} · ${e(f.homeName)} — ${e(f.awayName)}`
       : `${e(f.label)} · ${f.home === c.team.id ? 'дома' : 'в гостях'} против ${e(f.opp)}`;
     const logBtnLabel = logLockInfo?.locked
-      ? '👁️ Посмотреть выезд'
-      : (logInfo?.organized ? 'Изменить выезд' : 'Организовать выезд');
-    const logStateText = logInfo?.organized
-      ? (logInfo.hasUnresolvedIncident ? 'организован · есть накладка' : 'организован')
-      : 'не организован';
-    const logStripHtml = logInfo ? `
-      <div class="log-card-strip" style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid ${logInfo.hasUnresolvedIncident ? '#fcd34d' : logInfo.organized ? '#86efac' : '#fde68a'};background:${logInfo.hasUnresolvedIncident ? '#fffbeb' : logInfo.organized ? '#f0fdf4' : '#fffbeb'};color:${logInfo.hasUnresolvedIncident ? '#92400e' : logInfo.organized ? '#166534' : '#92400e'};display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <span><b>✈️ Выезд:</b> ${logStateText}</span>
-        <button type="button" class="btn alt sm open-logistics" data-log-fid="${e(f.id)}" style="white-space:nowrap">${logBtnLabel}</button>
-      </div>` : '';
+      ? '👁️ Выезд'
+      : (logInfo?.organized ? '✈️ Выезд' : '✈️ Организовать выезд');
+    const logStatusBadge = logInfo
+      ? (logInfo.organized
+          ? ' <span class="tag">выезд подан</span>'
+          : ' <span class="tag" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">выезд не подан</span>')
+      : '';
     const bonusInfo = !isIntra ? (c.matchBonuses?.byFixtureId?.[f.id] || null) : null;
     const hasActiveBonus = !!(bonusInfo && (bonusInfo.teamBonus?.enabled || (bonusInfo.playerBonuses || []).length));
     const bonusBtnStripLabel = lockInfo.locked ? '👁️ Посмотреть премиальные' : 'Изменить премиальные';
@@ -11638,13 +11635,13 @@ async function pgClub(app) {
             <div style="margin-top:3px">${formatFxTimes(f)}</div>
           </div>
         </div>
-        <span>${isIntra ? '<span class="tag" style="background:#f0fdf4;color:#15803d;border-color:#86efac">спарринг</span> ' : ''}${f.derby ? '<span class="tag derby">дерби</span> ' : ''}${f.rivalry ? '<span class="tag" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd">принципиальный</span> ' : ''}${statusBadge}${lockBadgeHtml}</span>
+        <span>${isIntra ? '<span class="tag" style="background:#f0fdf4;color:#15803d;border-color:#86efac">спарринг</span> ' : ''}${f.derby ? '<span class="tag derby">дерби</span> ' : ''}${f.rivalry ? '<span class="tag" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd">принципиальный</span> ' : ''}${statusBadge}${logStatusBadge}${lockBadgeHtml}</span>
       </div>
-      ${logStripHtml}
       ${bonusStripHtml}
       ${(f.techRisk || []).length ? `<div style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px">⚠ Недостаточно доступных игроков в заявке: ${f.techRisk.map(e).join('; ')}.</div>` : ''}
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn alt sm open">${openBtnLabel}</button>
+        ${logInfo ? `<button type="button" class="btn alt sm open-logistics" data-log-fid="${e(f.id)}" style="white-space:nowrap">${logBtnLabel}</button>` : ''}
         ${!isIntra && !hasActiveBonus ? `<button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="0" ${lockInfo.locked ? 'disabled title="До начала матча осталось менее 10 минут"' : ''}>💰 Премиальные на матч</button>` : ''}
         ${isIntra ? `<button type="button" class="btn sm intra-cancel" data-intra-cancel="${e(f.id)}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" ${lockInfo.locked ? 'disabled title="Отмена спарринга закрыта менее чем за 10 минут до матча"' : ''}>Отменить спарринг</button>` : ''}
       </div>
@@ -11691,7 +11688,7 @@ async function pgClub(app) {
       }
       if (logInfo) {
         const logBtn = p.querySelector('.open-logistics');
-        if (logLi?.locked && logBtn) logBtn.textContent = '👁️ Посмотреть выезд';
+        if (logLi?.locked && logBtn) logBtn.textContent = '👁️ Выезд';
       }
     });
     return true;
