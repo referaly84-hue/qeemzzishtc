@@ -8057,7 +8057,7 @@ async function pgTeamStats(app, teamId) {
 }
 
 /* ───── клуб ───── */
-let CT = 'matches', CTT = 'rpl', CT_STAFF = 'catalog', CLUB_TID = '', CLUB_TRQ_TAB = 'pending', ROSTER_LOAN_FILTER = 'all', LOGISTICS_PRESELECT_FID = '';
+let CT = 'matches', CTT = 'rpl', CT_STAFF = 'catalog', CLUB_TID = '', CLUB_TRQ_TAB = 'pending', ROSTER_LOAN_FILTER = 'all', LOGISTICS_PRESELECT_FID = '', CLUB_STAFF_OPEN = false;
 let WATCHLIST_FILTER = 'all', WATCHLIST_SEARCH = '', WATCHLIST_PREFILL = null;
 let COACH_WL_FILTER = 'all', COACH_WL_SEARCH = '';
 let FAMILY_WB = { leftId: '', rightId: '', leftQ: '', rightQ: '', leftPos: 'ALL', rightPos: 'ALL', leftSel: new Set(), rightSel: new Set(), autoReg: true, leftScroll: 0, rightScroll: 0 };
@@ -8203,12 +8203,15 @@ async function pgClub(app) {
   </div>` : ''}
 
   ${(c.team.staff && c.team.staff.filter(s => s.role !== 'head').length) ? `
-  <div class="panel" style="margin-bottom:16px">
-    <div class="row sp" style="margin-bottom:10px">
-      <h3 style="margin:0">Тренерский и медицинский штаб (${c.team.staff.filter(s => s.role !== 'head').length})</h3>
-      <span class="muted small">${isAdmin ? 'Полные данные специалистов (режим администратора)' : 'Ассистенты, тренеры вратарей, физподготовка и врачи'}</span>
+  <div class="panel" id="club_staff_panel" style="margin-bottom:16px">
+    <div class="row sp" id="club_staff_hdr" style="margin-bottom:${CLUB_STAFF_OPEN ? 10 : 0}px;cursor:pointer;gap:10px;align-items:center">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h3 style="margin:0">Тренерский и медицинский штаб (${c.team.staff.filter(s => s.role !== 'head').length})</h3>
+        <span class="muted small">${isAdmin ? 'Полные данные специалистов (режим администратора)' : 'Ассистенты, тренеры вратарей, физподготовка и врачи'}</span>
+      </div>
+      <button type="button" class="btn alt sm" id="btn_toggle_club_staff" style="white-space:nowrap">${CLUB_STAFF_OPEN ? '▲ Свернуть' : '▼ Развернуть'}</button>
     </div>
-    <div class="staff-grid">
+    <div class="staff-grid" id="club_staff_grid" style="${CLUB_STAFF_OPEN ? '' : 'display:none'}">
       ${c.team.staff.filter(s => s.role !== 'head').map(s => `
         <div class="staff-card">
           <div class="staff-avatar">${s.role === 'assistant' ? '📋' : s.role === 'gk' ? '🧤' : s.role === 'fitness' ? '⚡' : s.role === 'attack' ? '🎯' : s.role === 'doctor' ? '🩺' : '👔'}</div>
@@ -8246,6 +8249,17 @@ async function pgClub(app) {
   <div id="cb"></div>`;
 
   $('#tsel') && ($('#tsel').onchange = ev => { CLUB_TID = ev.target.value; refreshCornerLocksState(); pgClub(app); });
+  if ($('#club_staff_hdr')) {
+    $('#club_staff_hdr').onclick = () => {
+      CLUB_STAFF_OPEN = !CLUB_STAFF_OPEN;
+      const grid = $('#club_staff_grid');
+      const hdr = $('#club_staff_hdr');
+      const btn = $('#btn_toggle_club_staff');
+      if (grid) grid.style.display = CLUB_STAFF_OPEN ? '' : 'none';
+      if (hdr) hdr.style.marginBottom = CLUB_STAFF_OPEN ? '10px' : '0';
+      if (btn) btn.textContent = CLUB_STAFF_OPEN ? '▲ Свернуть' : '▼ Развернуть';
+    };
+  }
   app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { CT = b.dataset.t; pgClub(app); });
   $('#btn_open_finances_from_banner') && ($('#btn_open_finances_from_banner').onclick = () => { CT = 'finances'; pgClub(app); });
   $('#btn_read_all_notifs') && ($('#btn_read_all_notifs').onclick = async () => {
