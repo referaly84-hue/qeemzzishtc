@@ -11546,9 +11546,39 @@ async function pgClub(app) {
       <span>🎮 Игровое: <b>${fmtD(gd)}${gt ? ' ' + gt : ''}</b></span>
     </span>`;
   };
+  const buildCardCornerLockState = (f, logInfo, nowMs = Date.now()) => {
+    const li = getClientLineupLockInfo(f, nowMs);
+    const logLi = logInfo ? getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked }, nowMs) : null;
+    let badgeText = '';
+    let badgeStyle = 'display:none';
+    let badgeTitle = '';
+    if (li.locked) {
+      badgeText = logInfo ? '🔒 Все правки закрыты' : '🔒 Правки закрыты';
+      badgeStyle = 'background:#fef2f2;color:#991b1b;border-color:#fca5a5';
+      badgeTitle = 'Менее чем за 10 минут до матча редактирование закрыто';
+    } else if (logLi?.locked) {
+      const rem = li.remainingToLockMs;
+      badgeText = (Number.isFinite(rem) && rem > 0 && rem <= 60 * 60 * 1000)
+        ? `🔒 Выезд закрыт · ⏳ ${formatLineupLockRemaining(rem)}`
+        : '🔒 Выезд закрыт';
+      badgeStyle = 'background:#fef2f2;color:#991b1b;border-color:#fca5a5';
+      badgeTitle = 'Выездная логистика закрыта (<1 ч до матча)';
+    } else if (logLi && Number.isFinite(logLi.remainingToLockMs) && logLi.remainingToLockMs > 0 && logLi.remainingToLockMs <= 60 * 60 * 1000) {
+      badgeText = `⏳ Выезд: ${formatLineupLockRemaining(logLi.remainingToLockMs)}`;
+      badgeStyle = 'background:#fffbeb;color:#b45309;border-color:#fcd34d';
+      badgeTitle = 'До закрытия выездной логистики (за 1 ч до матча)';
+    } else if (Number.isFinite(li.remainingToLockMs) && li.remainingToLockMs > 0 && li.remainingToLockMs <= 60 * 60 * 1000) {
+      badgeText = `⏳ Правки: ${formatLineupLockRemaining(li.remainingToLockMs)}`;
+      badgeStyle = 'background:#fffbeb;color:#b45309;border-color:#fcd34d';
+      badgeTitle = 'До закрытия правок (за 10 мин до матча)';
+    }
+    return { li, logLi, badgeText, badgeStyle, badgeTitle };
+  };
+
   cb.innerHTML = upcomingSorted.map(f => {
     const isIntra = !!f.intraSquad;
-    const lockInfo = getClientLineupLockInfo(f);
+    const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
+    const { li: lockInfo, logLi: logLockInfo, badgeText, badgeStyle, badgeTitle } = buildCardCornerLockState(f, logInfo);
     const oppLogo = isIntra ? (c.team?.logo || f.homeLogo || '') : (f.oppLogo || teamLogo(f.home === c.team.id ? f.away : f.home));
     const statusBadge = isIntra
       ? ((f.homeLineup && f.awayLineup)
@@ -11558,29 +11588,20 @@ async function pgClub(app) {
               : '<span class="tag" style="background:#e0f2fe;color:#075985;border-color:#bae6fd">выберите оба состава (11 на 11)</span>'))
       : (f.lineup
           ? '<span class="tag">состав подан</span>'
-          : '<span class="tag" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" title="Если состав не подан до начала матча, команде засчитывается техническое поражение 0:3">состав не подан — риск тех. поражения</span>');
-    const lockBadgeHtml = lockInfo.locked
-      ? ' <span class="tag" data-lock-badge="1" style="background:#fef2f2;color:#991b1b;border-color:#fca5a5" title="Менее чем за 10 минут до начала матча редактирование состава и тактики закрыто">🔒 правки закрыты (&lt;10 мин)</span>'
-      : (lockInfo.remainingToLockMs > 0 && lockInfo.remainingToLockMs <= 60 * 60 * 1000
-          ? ` <span class="tag" data-lock-badge="1" style="background:#fffbeb;color:#b45309;border-color:#fcd34d" title="До закрытия редактирования состава и тактики (за 10 минут до начала матча)">⏳ правки ещё ${formatLineupLockRemaining(lockInfo.remainingToLockMs)}</span>`
-          : ' <span class="tag" data-lock-badge="1" style="display:none"></span>');
+          : '<span class="tag" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">состав не подан</span>');
+    const lockBadgeHtml = ` <span class="tag" data-lock-badge="1" style="${badgeStyle}" title="${e(badgeTitle)}">${e(badgeText)}</span>`;
     const titleHtml = isIntra
       ? `${e(f.label)} · ${e(f.homeName)} — ${e(f.awayName)}`
       : `${e(f.label)} · ${f.home === c.team.id ? 'дома' : 'в гостях'} против ${e(f.opp)}`;
-    const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
-    const logLockInfo = logInfo ? getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked }) : null;
-    const logBadgeHtml = !logLockInfo ? ''
-      : logLockInfo.locked
-        ? ' <span class="tag" data-log-lock-badge="1" style="background:#fef2f2;color:#991b1b;border-color:#fca5a5" title="Менее чем за 1 час до начала матча редактирование выездной логистики закрыто">🔒 логистика закрыта (&lt;1 ч)</span>'
-        : (Number.isFinite(logLockInfo.remainingToLockMs) && logLockInfo.remainingToLockMs <= 3 * 60 * 60 * 1000
-            ? ` <span class="tag" data-log-lock-badge="1" style="background:#fffbeb;color:#b45309;border-color:#fcd34d" title="До закрытия выездной логистики (за 1 час до начала матча)">⏳ выезд ещё ${formatLineupLockRemaining(logLockInfo.remainingToLockMs)}</span>`
-            : ' <span class="tag" data-log-lock-badge="1" style="display:none"></span>');
     const logBtnLabel = logLockInfo?.locked
-      ? '👁️ Посмотреть логистику (закрыто <1 ч)'
-      : (logInfo?.organized ? 'Изменить логистику' : 'Организовать выезд');
+      ? '👁️ Посмотреть выезд'
+      : (logInfo?.organized ? 'Изменить выезд' : 'Организовать выезд');
+    const logStateText = logInfo?.organized
+      ? (logInfo.hasUnresolvedIncident ? 'организован · есть накладка' : 'организован')
+      : 'не организован';
     const logStripHtml = logInfo ? `
-      <div style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid ${logLockInfo?.locked ? '#fecaca' : logInfo.hasUnresolvedIncident ? '#fcd34d' : logInfo.organized ? '#86efac' : '#fde68a'};background:${logLockInfo?.locked ? '#fef2f2' : logInfo.hasUnresolvedIncident ? '#fffbeb' : logInfo.organized ? '#f0fdf4' : '#fffbeb'};color:${logLockInfo?.locked ? '#991b1b' : logInfo.hasUnresolvedIncident ? '#92400e' : logInfo.organized ? '#166534' : '#92400e'};display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <span><b>✈️ Выезд (${e(logInfo.destCity)}, ${logInfo.distKm} км):</b> ${e(logInfo.summaryLine)}${logInfo.organized ? ` · Готовность ${logInfo.readinessScore}%` : ''}${logInfo.hasUnresolvedIncident ? ' · Есть дорожная накладка!' : ''}${logBadgeHtml}</span>
+      <div class="log-card-strip" style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid ${logInfo.hasUnresolvedIncident ? '#fcd34d' : logInfo.organized ? '#86efac' : '#fde68a'};background:${logInfo.hasUnresolvedIncident ? '#fffbeb' : logInfo.organized ? '#f0fdf4' : '#fffbeb'};color:${logInfo.hasUnresolvedIncident ? '#92400e' : logInfo.organized ? '#166534' : '#92400e'};display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <span><b>✈️ Выезд:</b> ${logStateText}</span>
         <button type="button" class="btn alt sm open-logistics" data-log-fid="${e(f.id)}" style="white-space:nowrap">${logBtnLabel}</button>
       </div>` : '';
     const bonusInfo = !isIntra ? (c.matchBonuses?.byFixtureId?.[f.id] || null) : null;
@@ -11592,7 +11613,7 @@ async function pgClub(app) {
         <button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="1" style="white-space:nowrap">${bonusBtnStripLabel}</button>
       </div>` : '';
     const openBtnLabel = lockInfo.locked
-      ? (isIntra ? '👁️ Посмотреть составы и тактику (правки закрыты)' : '👁️ Посмотреть состав и тактику (правки закрыты)')
+      ? (isIntra ? '👁️ Посмотреть составы и тактику' : '👁️ Посмотреть состав и тактику')
       : (isIntra ? 'Настроить оба состава (11 на 11), схемы и тактику' : 'Настроить состав, тактику и тренировки');
     return `<div class="panel" data-f="${f.id}">
       <div class="row sp">
@@ -11607,11 +11628,10 @@ async function pgClub(app) {
       </div>
       ${logStripHtml}
       ${bonusStripHtml}
-      <div class="lineup-card-lock-banner" style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;${lockInfo.locked ? '' : 'display:none'}">🔒 До начала матча осталось менее 10 минут — вносить правки в настройки матча (состав, тактика, премиальные) уже нельзя.</div>
-      ${(f.techRisk || []).length ? `<div style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px">⚠ Перед матчем будет присуждено техническое поражение 0:3: ${f.techRisk.map(e).join('; ')}.</div>` : ''}
+      ${(f.techRisk || []).length ? `<div style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px">⚠ Недостаточно доступных игроков в заявке: ${f.techRisk.map(e).join('; ')}.</div>` : ''}
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn alt sm open">${openBtnLabel}</button>
-        ${!isIntra && !hasActiveBonus ? `<button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="0" ${lockInfo.locked ? 'disabled title="До начала матча осталось менее 10 минут"' : ''}>${lockInfo.locked ? '🔒 Премиальные закрыты (<10 мин)' : '💰 Премиальные на матч'}</button>` : ''}
+        ${!isIntra && !hasActiveBonus ? `<button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="0" ${lockInfo.locked ? 'disabled title="До начала матча осталось менее 10 минут"' : ''}>💰 Премиальные на матч</button>` : ''}
         ${isIntra ? `<button type="button" class="btn sm intra-cancel" data-intra-cancel="${e(f.id)}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" ${lockInfo.locked ? 'disabled title="Отмена спарринга закрыта менее чем за 10 минут до матча"' : ''}>Отменить спарринг</button>` : ''}
       </div>
       <div class="form"></div>
@@ -11625,32 +11645,28 @@ async function pgClub(app) {
     cb.querySelectorAll('.panel[data-f]').forEach(p => {
       const f = upcomingSorted.find(x => x.id === p.dataset.f);
       if (!f) return;
-      const li = getClientLineupLockInfo(f, nowMs);
+      const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
+      const { li, logLi, badgeText, badgeStyle, badgeTitle } = buildCardCornerLockState(f, logInfo, nowMs);
       const badge = p.querySelector('[data-lock-badge]');
-      const banner = p.querySelector('.lineup-card-lock-banner');
+      if (badge) {
+        badge.setAttribute('style', badgeStyle);
+        badge.title = badgeTitle;
+        badge.textContent = badgeText;
+      }
       const openBtn = p.querySelector('.open');
       const bonusBtn = p.querySelector('.open-bonuses');
       const intraCancelBtn = p.querySelector('.intra-cancel');
       if (li.locked) {
-        if (badge) {
-          badge.style.display = '';
-          badge.style.background = '#fef2f2';
-          badge.style.color = '#991b1b';
-          badge.style.borderColor = '#fca5a5';
-          badge.textContent = '🔒 правки закрыты (<10 мин)';
-        }
-        if (banner) banner.style.display = '';
         if (openBtn) {
           openBtn.textContent = f.intraSquad
-            ? '👁️ Посмотреть составы и тактику (правки закрыты)'
-            : '👁️ Посмотреть состав и тактику (правки закрыты)';
+            ? '👁️ Посмотреть составы и тактику'
+            : '👁️ Посмотреть состав и тактику';
         }
         if (bonusBtn) {
           if (bonusBtn.dataset.hasBonus === '1') {
             bonusBtn.textContent = '👁️ Посмотреть премиальные';
           } else {
             bonusBtn.disabled = true;
-            bonusBtn.textContent = '🔒 Премиальные закрыты (<10 мин)';
             bonusBtn.title = 'До начала матча осталось менее 10 минут';
           }
         }
@@ -11658,38 +11674,10 @@ async function pgClub(app) {
           intraCancelBtn.disabled = true;
           intraCancelBtn.title = 'Отмена спарринга закрыта менее чем за 10 минут до матча';
         }
-      } else if (li.remainingToLockMs > 0 && li.remainingToLockMs <= 60 * 60 * 1000) {
-        if (badge) {
-          badge.style.display = '';
-          badge.style.background = '#fffbeb';
-          badge.style.color = '#b45309';
-          badge.style.borderColor = '#fcd34d';
-          badge.textContent = `⏳ правки ещё ${formatLineupLockRemaining(li.remainingToLockMs)}`;
-        }
       }
-      const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
       if (logInfo) {
-        const logLi = getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked }, nowMs);
-        const logBadge = p.querySelector('[data-log-lock-badge]');
         const logBtn = p.querySelector('.open-logistics');
-        if (logLi.locked) {
-          if (logBadge) {
-            logBadge.style.display = '';
-            logBadge.style.background = '#fef2f2';
-            logBadge.style.color = '#991b1b';
-            logBadge.style.borderColor = '#fca5a5';
-            logBadge.textContent = '🔒 логистика закрыта (<1 ч)';
-          }
-          if (logBtn) logBtn.textContent = '👁️ Посмотреть логистику (закрыто <1 ч)';
-        } else if (logLi.remainingToLockMs > 0 && logLi.remainingToLockMs <= 3 * 60 * 60 * 1000) {
-          if (logBadge) {
-            logBadge.style.display = '';
-            logBadge.style.background = '#fffbeb';
-            logBadge.style.color = '#b45309';
-            logBadge.style.borderColor = '#fcd34d';
-            logBadge.textContent = `⏳ выезд ещё ${formatLineupLockRemaining(logLi.remainingToLockMs)}`;
-          }
-        }
+        if (logLi?.locked && logBtn) logBtn.textContent = '👁️ Посмотреть выезд';
       }
     });
     return true;
