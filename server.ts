@@ -18875,7 +18875,7 @@ function getClubMatchLocksForState(req: any) {
     })
     .filter(Boolean)
     .sort((a: any, b: any) => a.kickoffAt - b.kickoffAt)
-    .slice(0, 8);
+    .slice(0, 10);
 }
 app.get("/api/state", (req, res) => {
   res.json({
@@ -21834,7 +21834,7 @@ app.get("/api/club", needClub, (req, res) => {
   const squadMax = Math.min(28, db.settings.squadMax || 28);
   const registrationWindow = getTransferWindowState();
   const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const up = seasonFx().filter((f) => (f.home === req.tid || f.away === req.tid) && f.status === "scheduled").sort((a, b) => realAt(a).getTime() - realAt(b).getTime() || (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 6);
+  const up = seasonFx().filter((f) => (f.home === req.tid || f.away === req.tid) && f.status === "scheduled").sort((a, b) => realAt(a).getTime() - realAt(b).getTime() || (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 10);
   const legionLimit = getRplLegionLimit(S());
   const legionSquadCount = sq.filter(isLegionnaire).length;
   const incoming = (db.transfers || []).filter((x) => x.from === req.tid && x.status === "pending").map((x) => ({
