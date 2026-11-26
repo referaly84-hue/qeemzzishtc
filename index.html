@@ -346,8 +346,6 @@ a.fxl{color:inherit}a.fxl:hover{background:var(--soft);text-decoration:none}
 .corner-lock-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;background:#fffbeb;color:#92400e;font-weight:800;font-size:13px;border:0;cursor:pointer;width:100%;justify-content:space-between}
 .corner-lock-timer.is-urgent .corner-lock-pill{background:#fef2f2;color:#991b1b}
 .corner-lock-timer.is-min{width:auto;min-width:176px}
-.club-notif-banner{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(185,28,28,0.08)}
-.club-notif-item{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff;border:1px solid #fecaca;border-radius:8px;margin-top:8px;flex-wrap:wrap}
 .modal{position:fixed;inset:0;background:#0d2f2199;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto}
 .modal>div{background:var(--panel);border-radius:10px;padding:22px;max-width:640px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,0.2)}
 .chip{display:inline-flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:2px 7px;font-size:13px}
@@ -8109,44 +8107,6 @@ async function pgClub(app) {
   setTransferCooldown(c.team.id, c.transferCooldown);
   const isAdmin = S.me?.role === 'admin';
   const logo = c.team.logo || teamLogo(c.team.id);
-  const clubNotifs = Array.isArray(c.notifications) ? c.notifications : [];
-  const unreadNotifs = clubNotifs.filter(n => !n.read);
-  const hasAlertNotif = unreadNotifs.some(n => n.type !== 'match_bonus');
-  const unreadNotifBannerHtml = unreadNotifs.length ? `
-    <div class="club-notif-banner" style="${hasAlertNotif ? '' : 'background:#f0fdf4;border-color:#86efac'}">
-      <div class="row sp" style="gap:8px;flex-wrap:wrap;align-items:center">
-        <div style="font-weight:800;font-size:15px;color:${hasAlertNotif ? '#991b1b' : '#166534'};display:flex;align-items:center;gap:7px">
-          <span>🔔</span>
-          <span>Автоматические уведомления по счёту клуба (${unreadNotifs.length})</span>
-        </div>
-        <div class="row" style="gap:8px">
-          <button type="button" class="btn alt sm" id="btn_open_finances_from_banner">История операций</button>
-          <button type="button" class="btn sm" id="btn_read_all_notifs" style="background:${hasAlertNotif ? '#991b1b' : '#15803d'};color:#fff">Отметить все прочитанными</button>
-        </div>
-      </div>
-      ${unreadNotifs.slice(0, 5).map(n => {
-        const isBonusPaid = n.type === 'match_bonus' && n.subtype === 'paid';
-        const isBonusUnmet = n.type === 'match_bonus' && n.subtype !== 'paid';
-        const itemBd = isBonusPaid ? '#bbf7d0' : isBonusUnmet ? '#cbd5e1' : '#fecaca';
-        const tagBg = isBonusPaid ? '#dcfce7' : isBonusUnmet ? '#f1f5f9' : '#fee2e2';
-        const tagFg = isBonusPaid ? '#166534' : isBonusUnmet ? '#334155' : '#991b1b';
-        const tagBd = isBonusPaid ? '#86efac' : isBonusUnmet ? '#cbd5e1' : '#fca5a5';
-        const tagIcon = isBonusPaid ? '🏆' : isBonusUnmet ? 'ℹ️' : '💸';
-        const titleColor = isBonusPaid ? '#166534' : isBonusUnmet ? '#1e293b' : '#7f1d1d';
-        return `
-        <div class="club-notif-item" style="border-color:${itemBd}">
-          <div style="flex:1;min-width:220px">
-            <div class="row" style="gap:8px;margin-bottom:4px;flex-wrap:wrap;align-items:center">
-              ${n.formattedAmount ? `<span class="tag" style="background:${tagBg};color:${tagFg};border-color:${tagBd};font-weight:800">${tagIcon} ${e(n.formattedAmount)}</span>` : ''}
-              <b style="color:${titleColor}">${e(n.title || 'Уведомление')}</b>
-              <span class="muted small">${n.date ? new Date(n.date).toLocaleString('ru-RU') : ''}</span>
-            </div>
-            <div style="font-size:13.5px;color:#334155;line-height:1.45">${e(n.message || '')}</div>
-          </div>
-          <button type="button" class="btn alt sm" data-read-notif="${e(n.id)}" style="white-space:nowrap">Прочитано</button>
-        </div>`;
-      }).join('')}
-    </div>` : '';
   const famTeams = Array.isArray(c.familyTeams) && c.familyTeams.length > 1 ? c.familyTeams : [];
   if (!famTeams.length && CT === 'family') CT = 'squad';
   const familyBarHtml = famTeams.length ? `
@@ -8177,7 +8137,6 @@ async function pgClub(app) {
     </div>
     ${S.me.role === 'admin' ? `<select id="tsel" style="max-width:240px">${(S.st?.teams || []).map(t => `<option value="${t.id}" ${t.id === CLUB_TID ? 'selected' : ''}>${e(t.name)} (${e(compName(t.comp))})</option>`).join('')}</select>` : ''}
   </div>
-  ${unreadNotifBannerHtml}
   ${familyBarHtml}
 
   ${c.team.coach ? `
@@ -8261,18 +8220,6 @@ async function pgClub(app) {
     };
   }
   app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { CT = b.dataset.t; pgClub(app); });
-  $('#btn_open_finances_from_banner') && ($('#btn_open_finances_from_banner').onclick = () => { CT = 'finances'; pgClub(app); });
-  $('#btn_read_all_notifs') && ($('#btn_read_all_notifs').onclick = async () => {
-    const r = await act(() => api('/club/notifications/read', withT({ all: true })));
-    if (r) {
-      toast('Уведомления отмечены как прочитанные');
-      pgClub(app);
-    }
-  });
-  app.querySelectorAll('[data-read-notif]').forEach(b => b.onclick = async () => {
-    const r = await act(() => api('/club/notifications/read', withT({ id: b.dataset.readNotif })));
-    if (r) pgClub(app);
-  });
   app.querySelectorAll('[data-fam-jump]').forEach(b => b.onclick = () => {
     const tid = b.dataset.famJump;
     if (!tid) return;
