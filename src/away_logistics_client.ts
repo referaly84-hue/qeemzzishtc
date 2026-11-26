@@ -226,7 +226,107 @@ function ensureLogisticsStyles() {
     .log-meter-track{flex:1;min-width:180px;height:7px;background:rgba(255,255,255,0.16);border-radius:999px;overflow:hidden}
     .log-meter-fill{height:100%;border-radius:999px;transition:width .2s ease}
     .log-breakdown{font-size:12px;color:#cce3d4}
+    .log-lock-banner{
+      border-radius:9px;
+      padding:10px 14px;
+      border:1px solid;
+      font-size:12.5px;
+      line-height:1.45;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .log-lock-banner.locked{background:#fef2f2;border-color:#fecaca;color:#991b1b;font-weight:600}
+    .log-lock-banner.soon{background:#fffbeb;border-color:#fcd34d;color:#92400e;font-weight:600}
+    .log-lock-banner.info{background:#f8fafc;border-color:var(--line);color:var(--muted)}
+    .log-status-locked{font-weight:700;color:#991b1b}
+    .log-preset-btn:disabled{opacity:.5;cursor:not-allowed}
+    .log-chk.disabled{opacity:.58;cursor:not-allowed;background:#f7f8f7}
+    .log-chk.disabled:hover{border-color:var(--line);background:#f7f8f7}
+    #btn_log_save:disabled,#btn_log_resolve_inc:disabled{opacity:.55;cursor:not-allowed}
   `;
+}
+
+const AWAY_LOGISTICS_LOCK_BEFORE_MS = 60 * 60 * 1000;
+
+function getClientLogisticsLockInfo(f: any, nowMs = Date.now()) {
+  if (!f || (f.status && f.status !== "scheduled")) {
+    return {
+      locked: true,
+      reason: "status" as const,
+      lockAt: f?.logisticsLockAt ?? null,
+      kickoffAt: f?.realStartAt ?? null,
+      remainingToLockMs: 0,
+    };
+  }
+  if (f?.hasRealSchedule === false) {
+    return {
+      locked: false,
+      reason: null,
+      lockAt: null,
+      kickoffAt: null,
+      remainingToLockMs: Infinity,
+    };
+  }
+  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim());
+  if (!hasExplicitDate && !Number.isFinite(f?.logisticsLockAt)) {
+    return {
+      locked: !!f?.logisticsLocked,
+      reason: f?.logisticsLocked ? ("time" as const) : null,
+      lockAt: null,
+      kickoffAt: null,
+      remainingToLockMs: Infinity,
+    };
+  }
+  let kickoffAt: number | null = null;
+  if (hasExplicitDate) {
+    const rd = String(f.realDate).trim();
+    const rt = String(f?.realTime || f?.time || "12:00").trim();
+    const m = rt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    const hhmmss = m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}` : "12:00:00";
+    const parsed = Date.parse(`${rd}T${hhmmss}+03:00`);
+    if (Number.isFinite(parsed)) kickoffAt = parsed;
+  } else if (Number.isFinite(f?.realStartAt)) {
+    kickoffAt = Number(f.realStartAt);
+  }
+  const lockAt = Number.isFinite(f?.logisticsLockAt)
+    ? Number(f.logisticsLockAt)
+    : kickoffAt !== null
+      ? kickoffAt - AWAY_LOGISTICS_LOCK_BEFORE_MS
+      : null;
+  if (lockAt === null) {
+    return {
+      locked: !!f?.logisticsLocked,
+      reason: f?.logisticsLocked ? ("time" as const) : null,
+      lockAt: null,
+      kickoffAt,
+      remainingToLockMs: Infinity,
+    };
+  }
+  const locked = !!f?.logisticsLocked || nowMs >= lockAt;
+  return {
+    locked,
+    reason: locked ? ("time" as const) : null,
+    lockAt,
+    kickoffAt,
+    remainingToLockMs: Math.max(0, lockAt - nowMs),
+  };
+}
+
+function formatLogisticsLockRemaining(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "0 сек";
+  const totalSec = Math.ceil(ms / 1000);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h} ч ${m} мин` : `${h} ч`;
+  }
+  if (mins >= 1) return `${mins} мин ${String(secs).padStart(2, "0")} сек`;
+  return `${secs} сек`;
 }
 
 function fmtEuro(n: number): string {
@@ -402,7 +502,8 @@ async function renderClubLogisticsTab(
     cb.innerHTML = '<div class="panel warn">Модуль логистики не подключён к ядру приложения</div>';
     return;
   }
-  const { api, act, e, S } = app;
+  const { api, act, e, S, toast } = app;
+  const notifyErr = (msg: string) => (toast ? toast(msg, true) : void 0);
   const tid = app.getClubTid ? app.getClubTid() : "";
   const q = tid ? `?teamId=${encodeURIComponent(tid)}` : "";
   const withT = (obj: any) => (tid ? { ...obj, teamId: tid } : obj);
@@ -458,7 +559,16 @@ async function renderClubLogisticsTab(
     draftByFixture[t.fixture.id] = JSON.parse(JSON.stringify(t.saved?.selection || t.defaultSelection));
   }
 
+  let logisticsTimer: ReturnType<typeof setInterval> | null = null;
+  const stopLogisticsTimer = () => {
+    if (logisticsTimer) {
+      clearInterval(logisticsTimer);
+      logisticsTimer = null;
+    }
+  };
+
   const renderUI = () => {
+    stopLogisticsTimer();
     const trip = trips.find((t) => t.fixture.id === activeSelectedFixtureId) || trips[0];
     const f = trip.fixture;
     const cat = trip.catalog;
@@ -471,6 +581,8 @@ async function renderClubLogisticsTab(
     const deltaCost = ev.totalCost - prevPaid;
     const curBudget = Number(data?.team?.budget || 0);
     const cantAfford = deltaCost > 0 && curBudget < deltaCost;
+    const lockInfo = getClientLogisticsLockInfo(f);
+    const isLocked = lockInfo.locked;
 
     const readinessColor = ev.readinessScore >= 82 ? "#4ade80" : ev.readinessScore >= 64 ? "#fde047" : "#fca5a5";
     const effSign = ev.energyDelta > 0 ? "+" : "";
@@ -478,20 +590,25 @@ async function renderClubLogisticsTab(
     const renderTripCard = (item: any) => {
       const fx = item.fixture;
       const isOn = fx.id === f.id;
+      const tripLock = getClientLogisticsLockInfo(fx);
       const hasInc = !!(item.saved?.incident && !item.saved.incident.resolved);
       const skyLvl = item.catalog?.skyStatus?.level;
-      const statusHtml = hasInc
-        ? `<span class="log-status-inc">Накладка · ${item.saved.readinessScore}%</span>`
-        : item.organized
-          ? `<span class="log-status-ok">Готовность ${item.saved.readinessScore}%</span>`
-          : `<span class="log-status-warn">Не оформлен · риск ТН 0:3 и штрафа</span>`;
-      const corridorNote = !item.catalog?.destAirport
-        ? "Аэропорт закрыт"
-        : skyLvl === "high"
-          ? "Риск «Ковёр»/погода"
-          : skyLvl === "caution"
-            ? "Осторожно: авиа"
-            : "Дорога открыта";
+      const statusHtml = tripLock.locked
+        ? `<span class="log-status-locked">🔒 Закрыто (&lt;1 ч)${item.organized ? ` · ${item.saved.readinessScore}%` : ""}</span>`
+        : hasInc
+          ? `<span class="log-status-inc">Накладка · ${item.saved.readinessScore}%</span>`
+          : item.organized
+            ? `<span class="log-status-ok">Готовность ${item.saved.readinessScore}%</span>`
+            : `<span class="log-status-warn">Не оформлен · риск ТН 0:3 и штрафа</span>`;
+      const corridorNote = !tripLock.locked && Number.isFinite(tripLock.remainingToLockMs) && tripLock.remainingToLockMs <= 3 * 60 * 60 * 1000
+        ? `<span data-trip-lock-cd="${e(fx.id)}" style="color:#b45309;font-weight:700">⏳ ещё ${formatLogisticsLockRemaining(tripLock.remainingToLockMs)}</span>`
+        : !item.catalog?.destAirport
+          ? "Аэропорт закрыт"
+          : skyLvl === "high"
+            ? "Риск «Ковёр»/погода"
+            : skyLvl === "caution"
+              ? "Осторожно: авиа"
+              : "Дорога открыта";
       return `
         <button type="button" class="log-trip-btn ${isOn ? "on" : ""}" data-log-pick="${e(fx.id)}">
           <div class="log-trip-top">
@@ -552,11 +669,17 @@ async function renderClubLogisticsTab(
             </div>
             <div class="log-presets">
               <span class="small muted" style="font-weight:600;margin-right:2px">Быстрая смета:</span>
-              <button type="button" class="log-preset-btn" data-log-preset="economy">Эконом</button>
-              <button type="button" class="log-preset-btn" data-log-preset="optimum">Оптимум</button>
-              <button type="button" class="log-preset-btn" data-log-preset="premium">Премиум / Чартер</button>
+              <button type="button" class="log-preset-btn" data-log-preset="economy" ${isLocked ? "disabled" : ""}>Эконом</button>
+              <button type="button" class="log-preset-btn" data-log-preset="optimum" ${isLocked ? "disabled" : ""}>Оптимум</button>
+              <button type="button" class="log-preset-btn" data-log-preset="premium" ${isLocked ? "disabled" : ""}>Премиум / Чартер</button>
             </div>
           </div>
+
+          ${isLocked
+            ? `<div class="log-lock-banner locked"><span>🔒 До начала матча осталось менее 1 часа — оформление, изменение выездной логистики и устранение накладок уже закрыты.</span></div>`
+            : Number.isFinite(lockInfo.remainingToLockMs) && lockInfo.remainingToLockMs <= 3 * 60 * 60 * 1000
+              ? `<div class="log-lock-banner soon" id="log_lock_banner"><span>⏳ Выездная логистика закрывается за 1 час до матча — осталось: <b id="log_lock_cd">${formatLogisticsLockRemaining(lockInfo.remainingToLockMs)}</b></span></div>`
+              : `<div class="log-lock-banner info"><span>ℹ️ Выездную логистику можно оформить или изменить не позднее чем за 1 час до начала матча.</span></div>`}
 
           <div class="log-sky-banner ${e(sky.level || "clear")}">
             <div style="flex:1;min-width:240px">
@@ -580,8 +703,8 @@ async function renderClubLogisticsTab(
               </div>
             </div>
             ${!incident.resolved ? `
-              <button type="button" class="btn sm" id="btn_log_resolve_inc" style="background:#b45309;color:#fff;white-space:nowrap">
-                ${e(incident.fixLabel)} (−${fmtEuro(incident.fixCost)})
+              <button type="button" class="btn sm" id="btn_log_resolve_inc" style="background:#b45309;color:#fff;white-space:nowrap" ${isLocked ? `disabled title="Редактирование закрыто менее чем за 1 час до матча"` : ""}>
+                ${isLocked ? "Закрыто (<1 ч)" : `${e(incident.fixLabel)} (−${fmtEuro(incident.fixCost)})`}
               </button>` : ""}
           </div>
         ` : ""}
@@ -593,7 +716,7 @@ async function renderClubLogisticsTab(
           </div>
           <div class="log-grid">
             ${cat.transportOptions.map((o: any) => `
-              <button type="button" class="log-opt ${sel.transport === o.id ? "on" : ""}" data-opt-group="transport" data-opt-val="${e(o.id)}" ${o.available === false ? "disabled" : ""}>
+              <button type="button" class="log-opt ${sel.transport === o.id ? "on" : ""}" data-opt-group="transport" data-opt-val="${e(o.id)}" ${isLocked || o.available === false ? "disabled" : ""}>
                 <div>
                   <div class="log-opt-row">
                     <div>
@@ -623,7 +746,7 @@ async function renderClubLogisticsTab(
             <div class="small" style="font-weight:700;margin-bottom:8px;color:var(--deep)">Квота билетов делегации и гостевой сектор</div>
             <div class="log-grid">
               ${cat.delegationOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.delegation === o.id ? "on" : ""}" data-opt-group="delegation" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.delegation === o.id ? "on" : ""}" data-opt-group="delegation" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div>
                     <div class="log-opt-row">
                       <span class="log-opt-name">${e(o.label)}</span>
@@ -647,7 +770,7 @@ async function renderClubLogisticsTab(
               const arrObj = cat.arrivalOptions.find((a: any) => a.id === sel.arrival) || cat.arrivalOptions[0];
               const calcCost = roundMoneyClient(o.baseCost * (arrObj?.hotelMultiplier || 1));
               return `
-                <button type="button" class="log-opt ${sel.hotel === o.id ? "on" : ""}" data-opt-group="hotel" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.hotel === o.id ? "on" : ""}" data-opt-group="hotel" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div>
                     <div class="log-opt-row">
                       <span class="log-opt-name">${e(o.label)}</span>
@@ -668,7 +791,7 @@ async function renderClubLogisticsTab(
             <div class="small" style="font-weight:700;margin-bottom:8px;color:var(--deep)">График заезда команды</div>
             <div class="log-grid">
               ${cat.arrivalOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.arrival === o.id ? "on" : ""}" data-opt-group="arrival" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.arrival === o.id ? "on" : ""}" data-opt-group="arrival" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div>
                     <div class="log-opt-row">
                       <div>
@@ -696,7 +819,7 @@ async function renderClubLogisticsTab(
             </div>
             <div style="display:flex;flex-direction:column;gap:8px">
               ${cat.cateringOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.catering === o.id ? "on" : ""}" data-opt-group="catering" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.catering === o.id ? "on" : ""}" data-opt-group="catering" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div class="log-opt-row">
                     <span class="log-opt-name">${e(o.label)}</span>
                     <span class="log-opt-price">${o.cost > 0 ? fmtEuro(o.cost) : "€0"}</span>
@@ -706,7 +829,7 @@ async function renderClubLogisticsTab(
               `).join("")}
               <div style="border-top:1px solid var(--line);margin:4px 0"></div>
               ${cat.medicalOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.medical === o.id ? "on" : ""}" data-opt-group="medical" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.medical === o.id ? "on" : ""}" data-opt-group="medical" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div class="log-opt-row">
                     <span class="log-opt-name">${e(o.label)}</span>
                     <span class="log-opt-price">${o.cost > 0 ? fmtEuro(o.cost) : "€0"}</span>
@@ -724,7 +847,7 @@ async function renderClubLogisticsTab(
             </div>
             <div style="display:flex;flex-direction:column;gap:8px">
               ${cat.localTransferOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.localTransfer === o.id ? "on" : ""}" data-opt-group="localTransfer" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.localTransfer === o.id ? "on" : ""}" data-opt-group="localTransfer" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div class="log-opt-row">
                     <span class="log-opt-name">${e(o.label)}</span>
                     <span class="log-opt-price">${fmtEuro(o.cost)}</span>
@@ -733,7 +856,7 @@ async function renderClubLogisticsTab(
                 </button>
               `).join("")}
               ${cat.trainingPitchOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.trainingPitch === o.id ? "on" : ""}" data-opt-group="trainingPitch" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.trainingPitch === o.id ? "on" : ""}" data-opt-group="trainingPitch" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div class="log-opt-row">
                     <span class="log-opt-name">${e(o.label)}</span>
                     <span class="log-opt-price">${o.cost > 0 ? fmtEuro(o.cost) : "€0"}</span>
@@ -742,7 +865,7 @@ async function renderClubLogisticsTab(
                 </button>
               `).join("")}
               ${cat.insuranceOptions.map((o: any) => `
-                <button type="button" class="log-opt ${sel.insurance === o.id ? "on" : ""}" data-opt-group="insurance" data-opt-val="${e(o.id)}">
+                <button type="button" class="log-opt ${sel.insurance === o.id ? "on" : ""}" data-opt-group="insurance" data-opt-val="${e(o.id)}" ${isLocked ? "disabled" : ""}>
                   <div class="log-opt-row">
                     <span class="log-opt-name">${e(o.label)}</span>
                     <span class="log-opt-price">${o.cost > 0 ? fmtEuro(o.cost) : "€0"}</span>
@@ -760,20 +883,20 @@ async function renderClubLogisticsTab(
             <span class="log-sec-hint">Пропущенный пункт повышает риск накладки и снижает готовность</span>
           </div>
           <div class="log-checklist">
-            <label class="log-chk">
-              <input type="checkbox" data-log-chk="reserveKit" ${sel.kitPrep?.reserveKit !== false ? "checked" : ""}/>
+            <label class="log-chk ${isLocked ? "disabled" : ""}">
+              <input type="checkbox" data-log-chk="reserveKit" ${sel.kitPrep?.reserveKit !== false ? "checked" : ""} ${isLocked ? "disabled" : ""}/>
               <span>Два комплекта формы (основа + резерв под цвета хозяев)</span>
             </label>
-            <label class="log-chk">
-              <input type="checkbox" data-log-chk="weatherGear" ${sel.kitPrep?.weatherGear !== false ? "checked" : ""}/>
+            <label class="log-chk ${isLocked ? "disabled" : ""}">
+              <input type="checkbox" data-log-chk="weatherGear" ${sel.kitPrep?.weatherGear !== false ? "checked" : ""} ${isLocked ? "disabled" : ""}/>
               <span>Термобельё, накидки и дождевики под прогноз погоды</span>
             </label>
-            <label class="log-chk">
-              <input type="checkbox" data-log-chk="studsCheck" ${sel.kitPrep?.studsCheck !== false ? "checked" : ""}/>
+            <label class="log-chk ${isLocked ? "disabled" : ""}">
+              <input type="checkbox" data-log-chk="studsCheck" ${sel.kitPrep?.studsCheck !== false ? "checked" : ""} ${isLocked ? "disabled" : ""}/>
               <span>Сменные шипы SG/FG под состояние газона арены</span>
             </label>
-            <label class="log-chk">
-              <input type="checkbox" data-log-chk="docsVerified" ${sel.kitPrep?.docsVerified !== false ? "checked" : ""}/>
+            <label class="log-chk ${isLocked ? "disabled" : ""}">
+              <input type="checkbox" data-log-chk="docsVerified" ${sel.kitPrep?.docsVerified !== false ? "checked" : ""} ${isLocked ? "disabled" : ""}/>
               <span>Паспорта делегации, заявочные листы и допуски РФС</span>
             </label>
           </div>
@@ -806,9 +929,9 @@ async function renderClubLogisticsTab(
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              ${cantAfford ? `<span class="small" style="color:#fca5a5;font-weight:700">Не хватает ${fmtEuro(deltaCost - curBudget)}</span>` : ""}
-              <button type="button" class="btn" id="btn_log_save" style="background:var(--yellow);color:var(--deep);font-weight:800;padding:11px 20px;border-radius:9px" ${cantAfford ? "disabled" : ""}>
-                ${saved ? (deltaCost === 0 ? "Обновить план выезда" : deltaCost > 0 ? `Доплатить ${fmtEuro(deltaCost)} и сохранить` : `Сохранить (возврат ${fmtEuro(Math.abs(deltaCost))})`) : `Оплатить ${fmtEuro(ev.totalCost)} и утвердить выезд`}
+              ${!isLocked && cantAfford ? `<span class="small" style="color:#fca5a5;font-weight:700">Не хватает ${fmtEuro(deltaCost - curBudget)}</span>` : ""}
+              <button type="button" class="btn" id="btn_log_save" style="background:var(--yellow);color:var(--deep);font-weight:800;padding:11px 20px;border-radius:9px" ${isLocked || cantAfford ? "disabled" : ""} ${isLocked ? `title="Оформление и изменение логистики закрывается за 1 час до матча"` : ""}>
+                ${isLocked ? "🔒 Логистика закрыта (<1 ч)" : saved ? (deltaCost === 0 ? "Обновить план выезда" : deltaCost > 0 ? `Доплатить ${fmtEuro(deltaCost)} и сохранить` : `Сохранить (возврат ${fmtEuro(Math.abs(deltaCost))})`) : `Оплатить ${fmtEuro(ev.totalCost)} и утвердить выезд`}
               </button>
             </div>
           </div>
@@ -862,6 +985,11 @@ async function renderClubLogisticsTab(
 
     cb.querySelectorAll("[data-log-preset]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (getClientLogisticsLockInfo(f).locked) {
+          notifyErr("До начала матча осталось менее 1 часа — изменить выездную логистику уже нельзя");
+          renderUI();
+          return;
+        }
         const preset = (btn as HTMLElement).dataset.logPreset as "economy" | "optimum" | "premium";
         draftByFixture[f.id] = buildPresetSelection(cat, preset);
         renderUI();
@@ -870,6 +998,11 @@ async function renderClubLogisticsTab(
 
     cb.querySelectorAll("[data-opt-group]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (getClientLogisticsLockInfo(f).locked) {
+          notifyErr("До начала матча осталось менее 1 часа — изменить выездную логистику уже нельзя");
+          renderUI();
+          return;
+        }
         const el = btn as HTMLElement;
         const grp = el.dataset.optGroup;
         const val = el.dataset.optVal;
@@ -881,6 +1014,11 @@ async function renderClubLogisticsTab(
 
     cb.querySelectorAll("[data-log-chk]").forEach((inp) => {
       inp.addEventListener("change", () => {
+        if (getClientLogisticsLockInfo(f).locked) {
+          notifyErr("До начала матча осталось менее 1 часа — изменить выездную логистику уже нельзя");
+          renderUI();
+          return;
+        }
         const el = inp as HTMLInputElement;
         const k = el.dataset.logChk;
         if (!k) return;
@@ -891,6 +1029,11 @@ async function renderClubLogisticsTab(
     });
 
     cb.querySelector("#btn_log_save")?.addEventListener("click", async () => {
+      if (getClientLogisticsLockInfo(f).locked) {
+        notifyErr("До начала матча осталось менее 1 часа — оформить или изменить выездную логистику уже нельзя");
+        renderUI();
+        return;
+      }
       const r = await act(
         () => api("/club/logistics/save", withT({ fixtureId: f.id, selection: draftByFixture[f.id] })),
         (d: any) => d?.message || "Выездная логистика сохранена!"
@@ -902,6 +1045,11 @@ async function renderClubLogisticsTab(
     });
 
     cb.querySelector("#btn_log_resolve_inc")?.addEventListener("click", async () => {
+      if (getClientLogisticsLockInfo(f).locked) {
+        notifyErr("До начала матча осталось менее 1 часа — устранить дорожную накладку уже нельзя");
+        renderUI();
+        return;
+      }
       const r = await act(
         () => api("/club/logistics/resolve-incident", withT({ fixtureId: f.id })),
         (d: any) => d?.message || "Накладка устранена!"
@@ -911,6 +1059,46 @@ async function renderClubLogisticsTab(
         onRefreshClub();
       }
     });
+
+    const needsTicker = trips.some((t) => {
+      const li = getClientLogisticsLockInfo(t.fixture);
+      return !li.locked && Number.isFinite(li.remainingToLockMs) && li.remainingToLockMs <= 24 * 60 * 60 * 1000;
+    });
+    if (needsTicker) {
+      logisticsTimer = setInterval(() => {
+        if (!cb.isConnected) {
+          stopLogisticsTimer();
+          return;
+        }
+        const nowMs = Date.now();
+        const curInfo = getClientLogisticsLockInfo(f, nowMs);
+        if (curInfo.locked && !isLocked) {
+          renderUI();
+          return;
+        }
+        const cdEl = cb.querySelector("#log_lock_cd");
+        if (cdEl && !curInfo.locked && Number.isFinite(curInfo.remainingToLockMs)) {
+          cdEl.textContent = formatLogisticsLockRemaining(curInfo.remainingToLockMs);
+        } else if (!cdEl && !curInfo.locked && curInfo.remainingToLockMs <= 3 * 60 * 60 * 1000) {
+          renderUI();
+          return;
+        }
+        for (const item of trips) {
+          const ti = getClientLogisticsLockInfo(item.fixture, nowMs);
+          const tripCdEl = cb.querySelector(`[data-trip-lock-cd="${item.fixture.id}"]`);
+          if (ti.locked && tripCdEl) {
+            renderUI();
+            return;
+          }
+          if (tripCdEl && !ti.locked) {
+            tripCdEl.textContent = `⏳ ещё ${formatLogisticsLockRemaining(ti.remainingToLockMs)}`;
+          } else if (!tripCdEl && !ti.locked && ti.remainingToLockMs <= 3 * 60 * 60 * 1000) {
+            renderUI();
+            return;
+          }
+        }
+      }, 1000);
+    }
   };
 
   renderUI();

@@ -136,6 +136,7 @@ h3{font:600 15px Onest,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;marg
   .modal{padding:10px 6px}
   .modal>div{padding:16px 12px;border-radius:10px;max-width:100%}
   .filter-pills{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+  .corner-lock-timer{right:10px;bottom:10px;width:min(310px,calc(100vw - 20px))}
 }
 .muted{color:var(--muted)}.small{font-size:13px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sp{justify-content:space-between}
@@ -330,10 +331,21 @@ a.fxl{color:inherit}a.fxl:hover{background:var(--soft);text-decoration:none}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--deep);color:#fff;padding:11px 18px;border-radius:8px;z-index:60;max-width:90vw;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
 .toast.err{background:var(--red)}
 .toast.deduct{background:#7f1d1d;border:1.5px solid #fca5a5;color:#fff;font-weight:600;max-width:min(92vw,540px);line-height:1.45;box-shadow:0 8px 24px rgba(127,29,29,0.4)}
-.notif-bell-btn{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:4px 9px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;line-height:1.2}
-.notif-bell-btn:hover{background:rgba(255,255,255,0.24)}
-.notif-bell-btn.has-unread{background:rgba(220,38,38,0.85);border-color:#fca5a5;color:#fff}
-.notif-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#fef08a;color:#7f1d1d;font-size:11px;font-weight:800}
+.corner-lock-timer{position:fixed;right:16px;bottom:16px;z-index:45;width:328px;max-width:calc(100vw - 24px);background:#fff;border:1.5px solid #fcd34d;border-radius:12px;box-shadow:0 10px 28px rgba(16,38,28,0.18);overflow:hidden;font-size:13px;color:var(--ink)}
+.corner-lock-timer.is-urgent{border-color:#dc2626;box-shadow:0 10px 30px rgba(185,28,28,0.25)}
+.corner-lock-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;background:#fffbeb;border-bottom:1px solid #fde68a;font-weight:800;font-size:12.5px;color:#92400e}
+.corner-lock-timer.is-urgent .corner-lock-hdr{background:#fef2f2;border-bottom-color:#fecaca;color:#991b1b}
+.corner-lock-toggle{background:rgba(0,0,0,0.06);border:0;border-radius:6px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:inherit;font-weight:800;font-size:14px;line-height:1}
+.corner-lock-toggle:hover{background:rgba(0,0,0,0.12)}
+.corner-lock-list{display:flex;flex-direction:column;max-height:240px;overflow:auto}
+.corner-lock-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--line);padding:9px 11px;cursor:pointer;transition:background .15s;color:inherit;font:inherit}
+.corner-lock-item:last-child{border-bottom:0}
+.corner-lock-item:hover{background:var(--soft)}
+.corner-lock-cd{font-variant-numeric:tabular-nums;font-weight:800;font-size:15px;padding:4px 8px;border-radius:7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;white-space:nowrap;flex-shrink:0}
+.corner-lock-item.is-urgent .corner-lock-cd{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.corner-lock-pill{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;background:#fffbeb;color:#92400e;font-weight:800;font-size:13px;border:0;cursor:pointer;width:100%;justify-content:space-between}
+.corner-lock-timer.is-urgent .corner-lock-pill{background:#fef2f2;color:#991b1b}
+.corner-lock-timer.is-min{width:auto;min-width:176px}
 .club-notif-banner{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(185,28,28,0.08)}
 .club-notif-item{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff;border:1px solid #fecaca;border-radius:8px;margin-top:8px;flex-wrap:wrap}
 .modal{position:fixed;inset:0;background:#0d2f2199;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto}
@@ -462,7 +474,7 @@ img,svg,video{max-width:100%}
   .btn{min-height:44px;padding:9px 14px}.btn.sm{min-height:40px;padding:7px 12px;font-size:13.5px}
   .row>.btn:not(.sm),.row>input:not([type=checkbox]):not([type=radio]),.row>select{flex:1 1 150px}
   .tabs button,.pill-btn{min-height:42px;padding:8px 13px !important}
-  .who button,.notif-bell-btn{min-height:36px;padding:6px 10px}
+  .who button{min-height:36px;padding:6px 10px}
   #tsel{max-width:100% !important;width:100%}
   /* вкладки и фильтры — одной строкой с горизонтальной прокруткой (а не в 3–4 строки) */
   .tabs,.filter-pills,.cal-month-pills,.time-mode-tabs{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px}
@@ -1071,8 +1083,8 @@ function getClientLineupLockInfo(f, nowMs = Date.now()) {
       remainingToKickoffMs: 0
     };
   }
-  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || f.date || '').trim());
-  if (!hasExplicitDate && !Number.isFinite(f?.realStartAt) && !Number.isFinite(f?.lineupLockAt)) {
+  const hasExplicitRealDate = f?.hasRealSchedule !== false && /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || '').trim());
+  if (!hasExplicitRealDate && !Number.isFinite(f?.realStartAt) && !Number.isFinite(f?.lineupLockAt)) {
     return {
       locked: !!f?.lineupLocked,
       reason: f?.lineupLocked ? 'time' : null,
@@ -1083,8 +1095,8 @@ function getClientLineupLockInfo(f, nowMs = Date.now()) {
     };
   }
   let kickoffAt = Number.isFinite(f?.realStartAt) ? Number(f.realStartAt) : null;
-  if (kickoffAt === null) {
-    const rd = String(f?.realDate || f?.date || '').trim();
+  if (kickoffAt === null && hasExplicitRealDate) {
+    const rd = String(f?.realDate || '').trim();
     const rt = String(f?.realTime || f?.time || '12:00').trim();
     const m = rt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
     const hhmmss = m ? `${m[1].padStart(2, '0')}:${m[2]}:${m[3] || '00'}` : '12:00:00';
@@ -1126,6 +1138,58 @@ function formatLineupLockRemaining(ms) {
   }
   if (mins >= 1) return `${mins} мин ${String(secs).padStart(2, '0')} сек`;
   return `${secs} сек`;
+}
+
+const AWAY_LOGISTICS_LOCK_BEFORE_MS = 60 * 60 * 1000;
+function getClientLogisticsLockInfo(f, nowMs = Date.now()) {
+  if (!f || (f.status && f.status !== 'scheduled')) {
+    return {
+      locked: true,
+      reason: 'status',
+      lockAt: f?.logisticsLockAt || null,
+      kickoffAt: f?.realStartAt || null,
+      remainingToLockMs: 0
+    };
+  }
+  const hasExplicitRealDate = f?.hasRealSchedule !== false && /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || '').trim());
+  if (!hasExplicitRealDate && !Number.isFinite(f?.realStartAt) && !Number.isFinite(f?.logisticsLockAt)) {
+    return {
+      locked: !!f?.logisticsLocked,
+      reason: f?.logisticsLocked ? 'time' : null,
+      lockAt: null,
+      kickoffAt: null,
+      remainingToLockMs: Infinity
+    };
+  }
+  let kickoffAt = Number.isFinite(f?.realStartAt) ? Number(f.realStartAt) : null;
+  if (kickoffAt === null && hasExplicitRealDate) {
+    const rd = String(f?.realDate || '').trim();
+    const rt = String(f?.realTime || f?.time || '12:00').trim();
+    const m = rt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    const hhmmss = m ? `${m[1].padStart(2, '0')}:${m[2]}:${m[3] || '00'}` : '12:00:00';
+    const parsed = Date.parse(`${rd}T${hhmmss}+03:00`);
+    if (Number.isFinite(parsed)) kickoffAt = parsed;
+  }
+  const lockAt = Number.isFinite(f?.logisticsLockAt)
+    ? Number(f.logisticsLockAt)
+    : (kickoffAt !== null ? kickoffAt - AWAY_LOGISTICS_LOCK_BEFORE_MS : null);
+  if (lockAt === null) {
+    return {
+      locked: !!f?.logisticsLocked,
+      reason: f?.logisticsLocked ? 'time' : null,
+      lockAt: null,
+      kickoffAt,
+      remainingToLockMs: Infinity
+    };
+  }
+  const locked = !!f?.logisticsLocked || nowMs >= lockAt;
+  return {
+    locked,
+    reason: locked ? 'time' : null,
+    lockAt,
+    kickoffAt,
+    remainingToLockMs: Math.max(0, lockAt - nowMs)
+  };
 }
 
 function sortFixturesByActiveTime(arr) {
@@ -3220,12 +3284,186 @@ function renderCompetitionAiBlock(v) {
   </div>`;
 }
 
+const CORNER_LOCK_WINDOW_MS = 60 * 60 * 1000;
+const CORNER_TIMER_STATE = {
+  collapsed: false,
+  activeKeys: new Set(),
+  notifiedExpired: new Set(),
+  tickId: null
+};
+
+function getStateApiUrl() {
+  return CLUB_TID ? '/state?teamId=' + encodeURIComponent(CLUB_TID) : '/state';
+}
+
+function formatCornerClock(ms) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function ensureCornerTimerEl() {
+  let el = document.getElementById('corner_lock_timer');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'corner_lock_timer';
+    el.className = 'corner-lock-timer';
+    el.style.display = 'none';
+    el.addEventListener('click', ev => {
+      const toggleBtn = ev.target.closest('[data-corner-toggle]');
+      if (toggleBtn) {
+        ev.stopPropagation();
+        CORNER_TIMER_STATE.collapsed = !CORNER_TIMER_STATE.collapsed;
+        renderCornerEditTimer();
+        return;
+      }
+      const jumpBtn = ev.target.closest('[data-corner-jump]');
+      if (jumpBtn) {
+        const fid = jumpBtn.dataset.fid || '';
+        const kind = jumpBtn.dataset.kind || 'lineup';
+        const tid = jumpBtn.dataset.tid || '';
+        if (tid) {
+          CLUB_TID = tid;
+          if (S.me?.role === 'club') {
+            try { localStorage.setItem('rpl_club_tid', CLUB_TID); } catch (e) {}
+          }
+        }
+        if (kind === 'logistics') {
+          LOGISTICS_PRESELECT_FID = fid;
+          CT = 'logistics';
+        } else {
+          CT = 'matches';
+        }
+        if (location.hash.startsWith('#/club')) pgClub($('#app'));
+        else location.hash = '#/club';
+      }
+    });
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function renderCornerEditTimer() {
+  const el = ensureCornerTimerEl();
+  const locks = S.me && Array.isArray(S.st?.clubMatchLocks) ? S.st.clubMatchLocks : [];
+  if (!locks.length) {
+    el.style.display = 'none';
+    return;
+  }
+  const nowMs = Date.now();
+  const activeItems = [];
+  const nextActiveKeys = new Set();
+
+  for (const m of locks) {
+    if (Number.isFinite(m.lineupLockAt)) {
+      const rem = m.lineupLockAt - nowMs;
+      const key = `lineup:${m.fid}`;
+      if (rem <= 0) {
+        if (CORNER_TIMER_STATE.activeKeys.has(key) && !CORNER_TIMER_STATE.notifiedExpired.has(key)) {
+          CORNER_TIMER_STATE.notifiedExpired.add(key);
+          toast(`🔒 Правки состава и тактики на матч «${m.oppName}» закрыты (<10 мин до начала)`, true);
+        }
+      } else if (rem <= CORNER_LOCK_WINDOW_MS) {
+        nextActiveKeys.add(key);
+        activeItems.push({
+          key,
+          kind: 'lineup',
+          rem,
+          title: 'Правки состава и тактики',
+          ruleText: 'закрытие за 10 мин до матча',
+          m
+        });
+      }
+    }
+    if (m.needsTravel && Number.isFinite(m.logisticsLockAt)) {
+      const rem = m.logisticsLockAt - nowMs;
+      const key = `logistics:${m.fid}`;
+      if (rem <= 0) {
+        if (CORNER_TIMER_STATE.activeKeys.has(key) && !CORNER_TIMER_STATE.notifiedExpired.has(key)) {
+          CORNER_TIMER_STATE.notifiedExpired.add(key);
+          toast(`🔒 Выездная логистика на матч «${m.oppName}» закрыта (<1 ч до начала)`, true);
+        }
+      } else if (rem <= CORNER_LOCK_WINDOW_MS) {
+        nextActiveKeys.add(key);
+        activeItems.push({
+          key,
+          kind: 'logistics',
+          rem,
+          title: 'Выездная логистика',
+          ruleText: 'закрытие за 1 ч до матча',
+          m
+        });
+      }
+    }
+  }
+
+  CORNER_TIMER_STATE.activeKeys = nextActiveKeys;
+  if (!activeItems.length) {
+    el.style.display = 'none';
+    return;
+  }
+
+  activeItems.sort((a, b) => a.rem - b.rem);
+  const topUrgent = activeItems[0].rem <= 10 * 60 * 1000;
+  el.classList.toggle('is-urgent', topUrgent);
+  el.classList.toggle('is-min', !!CORNER_TIMER_STATE.collapsed);
+
+  if (CORNER_TIMER_STATE.collapsed) {
+    const first = activeItems[0];
+    el.innerHTML = `
+      <button type="button" class="corner-lock-pill" data-corner-toggle="1" title="Развернуть таймер закрытия правок">
+        <span>${topUrgent ? '🔴' : '⏳'} Правки${activeItems.length > 1 ? ` (${activeItems.length})` : ''}</span>
+        <span style="font-variant-numeric:tabular-nums">${formatCornerClock(first.rem)}</span>
+      </button>`;
+    el.style.display = '';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="corner-lock-hdr">
+      <span>${topUrgent ? '🔴' : '⏳'} До закрытия правок (${activeItems.length})</span>
+      <button type="button" class="corner-lock-toggle" data-corner-toggle="1" title="Свернуть">–</button>
+    </div>
+    <div class="corner-lock-list">
+      ${activeItems.map(it => {
+        const isUrgent = it.rem <= 10 * 60 * 1000;
+        const rd = it.m.realDate ? fmtD(it.m.realDate) : '';
+        const rt = it.m.realTime ? `${it.m.realTime} МСК` : '';
+        return `
+          <button type="button" class="corner-lock-item ${isUrgent ? 'is-urgent' : ''}" data-corner-jump="1" data-fid="${e(it.m.fid)}" data-kind="${e(it.kind)}" data-tid="${e(it.m.teamId || '')}">
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:700;font-size:12.5px;color:${isUrgent ? '#991b1b' : 'var(--deep)'};line-height:1.25">${e(it.title)}</div>
+              <div style="font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${e(it.m.oppName)}${it.m.label ? ` · ${e(it.m.label)}` : ''}</div>
+              <div class="muted" style="font-size:11px;margin-top:2px">${rd ? `${e(rd)} ` : ''}${e(rt)} · ${e(it.ruleText)}</div>
+            </div>
+            <div class="corner-lock-cd">${formatCornerClock(it.rem)}</div>
+          </button>`;
+      }).join('')}
+    </div>`;
+  el.style.display = '';
+}
+
+async function refreshCornerLocksState() {
+  if (!S.me) return;
+  try {
+    const fresh = await api(getStateApiUrl());
+    if (fresh) {
+      S.st = fresh;
+      renderCornerEditTimer();
+    }
+  } catch (e) {}
+}
+
 /* ───── каркас ───── */
 async function boot() {
   S.tok = localStorage.getItem('tok') || '';
   S.code = localStorage.getItem('rpl_auth_code') || '';
+  if (S.tok && !CLUB_TID) {
+    try { CLUB_TID = localStorage.getItem('rpl_club_tid') || ''; } catch (e) {}
+  }
   try {
-    S.st = await api('/state');
+    S.st = await api(getStateApiUrl());
   } catch (x) {
     $('#app').innerHTML = '<div class="empty">Сервер недоступен: ' + e(x.message) + '</div>';
     return;
@@ -3239,18 +3477,19 @@ async function boot() {
       if (r && r.token) {
         S.tok = r.token;
         S.code = r.code || S.code;
+        if (r.teamId && !CLUB_TID) CLUB_TID = r.teamId;
         try {
           localStorage.setItem('tok', r.token);
           localStorage.setItem('rpl_auth_code', S.code);
-          if (r.teamId) localStorage.setItem('rpl_club_tid', r.teamId);
+          if (r.teamId) localStorage.setItem('rpl_club_tid', CLUB_TID || r.teamId);
         } catch (e) {}
-        S.st = await api('/state');
+        S.st = await api(getStateApiUrl());
         S.me = {
           role: r.role,
           teamId: r.teamId || null,
           teamName: r.teamName || (r.team?.name) || (r.teamId ? teamName(r.teamId) : null)
         };
-        if (r.teamId) CLUB_TID = r.teamId;
+        if (r.teamId && !CLUB_TID) CLUB_TID = r.teamId;
       }
     } catch (loginErr) {
       console.warn('Автоматический вход по кэшу не удался:', loginErr);
@@ -3289,12 +3528,16 @@ async function boot() {
 
   drawChrome();
   announceNewClubNotifications(S.st?.clubNotifications);
+  renderCornerEditTimer();
+  if (!CORNER_TIMER_STATE.tickId) {
+    CORNER_TIMER_STATE.tickId = setInterval(renderCornerEditTimer, 1000);
+  }
   route();
 
-  // Фоновый опрос для моментального появления вкладки Жеребьёвки и уведомлений
+  // Фоновый опрос для моментального появления вкладки Жеребьёвки, уведомлений и таймера правок
   setInterval(async () => {
     try {
-      const fresh = await api('/state');
+      const fresh = await api(getStateApiUrl());
       if (fresh) {
         const prevLive = !!S.st?.liveDraw?.active;
         const nowLive = !!fresh.liveDraw?.active;
@@ -3304,6 +3547,7 @@ async function boot() {
         const nowUnread = Number(fresh.unreadNotificationsCount || 0);
         S.st = fresh;
         announceNewClubNotifications(fresh.clubNotifications);
+        renderCornerEditTimer();
         if (prevUnread !== nowUnread) {
           drawChrome();
         }
@@ -3373,27 +3617,10 @@ function drawChrome() {
     ? `<img src="${e(tgMeta.photoUrl)}" alt="" referrerpolicy="no-referrer" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
     : '';
 
-  const unreadCount = S.me?.role === 'club' ? Number(S.st?.unreadNotificationsCount || 0) : 0;
-  const bellBtn = S.me?.role === 'club'
-    ? `<button id="club_notif_bell" type="button" class="notif-bell-btn ${unreadCount > 0 ? 'has-unread' : ''}" title="${unreadCount > 0 ? `Новых уведомлений: ${unreadCount}` : 'Уведомления и финансы клуба'}">🔔${unreadCount > 0 ? `<span class="notif-badge">${unreadCount}</span>` : ''}</button>`
-    : '';
-
   const userBox = S.me
-    ? `${bellBtn}<span style="display:inline-flex;align-items:center;gap:6px">${tgAva}<span>${e(displayName)}</span></span><button id="out" title="Выйти из клуба">Выйти</button>`
+    ? `<span style="display:inline-flex;align-items:center;gap:6px">${tgAva}<span>${e(displayName)}</span></span><button id="out" title="Выйти из клуба">Выйти</button>`
     : `${tgMeta?.displayName ? `<span style="display:inline-flex;align-items:center;gap:6px;opacity:.92">${tgAva}<span>${e(tgMeta.displayName)}</span></span>` : ''}<a href="#/login" style="color:#fff;font-weight:600;white-space:nowrap">Войти по коду</a>`;
   $('#who').innerHTML = userBox;
-
-  const btnBell = $('#club_notif_bell');
-  if (btnBell) {
-    btnBell.onclick = () => {
-      CT = 'finances';
-      if (location.hash.startsWith('#/club')) {
-        pgClub($('#app'));
-      } else {
-        location.hash = '#/club';
-      }
-    };
-  }
 
   const btnOut = $('#out');
   if (btnOut) {
@@ -3403,7 +3630,10 @@ function drawChrome() {
       S.tok = '';
       S.code = '';
       S.me = null;
-      if (S.st) S.st.me = null;
+      if (S.st) {
+        S.st.me = null;
+        S.st.clubMatchLocks = [];
+      }
       CLUB_TID = '';
       try {
         localStorage.removeItem('tok');
@@ -3412,6 +3642,7 @@ function drawChrome() {
       } catch (x) { }
 
       drawChrome();
+      renderCornerEditTimer();
 
       if (oldTok) {
         try {
@@ -3702,7 +3933,10 @@ async function pgLogin(app) {
       S.tok = '';
       S.code = '';
       S.me = null;
-      if (S.st) S.st.me = null;
+      if (S.st) {
+        S.st.me = null;
+        S.st.clubMatchLocks = [];
+      }
       CLUB_TID = '';
       try {
         localStorage.removeItem('tok');
@@ -3710,6 +3944,7 @@ async function pgLogin(app) {
         localStorage.removeItem('rpl_club_tid');
       } catch (e) {}
       drawChrome();
+      renderCornerEditTimer();
       if (oldTok) {
         try {
           await fetch('/api/logout', {
@@ -3737,8 +3972,12 @@ async function pgLogin(app) {
     S.tok = '';
     S.code = '';
     S.me = null;
-    if (S.st) S.st.me = null;
+    if (S.st) {
+      S.st.me = null;
+      S.st.clubMatchLocks = [];
+    }
     CLUB_TID = '';
+    renderCornerEditTimer();
     try {
       localStorage.removeItem('tok');
       localStorage.removeItem('rpl_auth_code');
@@ -3788,7 +4027,7 @@ async function pgLogin(app) {
 
     // Запрашиваем актуальный state с новым токеном
     try {
-      const freshState = await api('/state');
+      const freshState = await api(getStateApiUrl());
       if (freshState) {
         S.st = freshState;
         // Личность берём из ответа /login, а не из state: state нужен только для данных
@@ -3800,6 +4039,7 @@ async function pgLogin(app) {
 
     drawChrome();
     announceNewClubNotifications(S.st?.clubNotifications);
+    renderCornerEditTimer();
 
     // Обновляем связь Telegram с клубом после входа
     try {
@@ -8005,7 +8245,7 @@ async function pgClub(app) {
   </div>
   <div id="cb"></div>`;
 
-  $('#tsel') && ($('#tsel').onchange = ev => { CLUB_TID = ev.target.value; pgClub(app); });
+  $('#tsel') && ($('#tsel').onchange = ev => { CLUB_TID = ev.target.value; refreshCornerLocksState(); pgClub(app); });
   app.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { CT = b.dataset.t; pgClub(app); });
   $('#btn_open_finances_from_banner') && ($('#btn_open_finances_from_banner').onclick = () => { CT = 'finances'; pgClub(app); });
   $('#btn_read_all_notifs') && ($('#btn_read_all_notifs').onclick = async () => {
@@ -8028,6 +8268,7 @@ async function pgClub(app) {
         if (S.me?.role === 'club') {
           try { localStorage.setItem('rpl_club_tid', CLUB_TID); } catch (e) {}
         }
+        refreshCornerLocksState();
         pgClub(app);
       } else {
         CT = 'family';
@@ -11327,17 +11568,28 @@ async function pgClub(app) {
       ? `${e(f.label)} · ${e(f.homeName)} — ${e(f.awayName)}`
       : `${e(f.label)} · ${f.home === c.team.id ? 'дома' : 'в гостях'} против ${e(f.opp)}`;
     const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
+    const logLockInfo = logInfo ? getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked }) : null;
+    const logBadgeHtml = !logLockInfo ? ''
+      : logLockInfo.locked
+        ? ' <span class="tag" data-log-lock-badge="1" style="background:#fef2f2;color:#991b1b;border-color:#fca5a5" title="Менее чем за 1 час до начала матча редактирование выездной логистики закрыто">🔒 логистика закрыта (&lt;1 ч)</span>'
+        : (Number.isFinite(logLockInfo.remainingToLockMs) && logLockInfo.remainingToLockMs <= 3 * 60 * 60 * 1000
+            ? ` <span class="tag" data-log-lock-badge="1" style="background:#fffbeb;color:#b45309;border-color:#fcd34d" title="До закрытия выездной логистики (за 1 час до начала матча)">⏳ выезд ещё ${formatLineupLockRemaining(logLockInfo.remainingToLockMs)}</span>`
+            : ' <span class="tag" data-log-lock-badge="1" style="display:none"></span>');
+    const logBtnLabel = logLockInfo?.locked
+      ? '👁️ Посмотреть логистику (закрыто <1 ч)'
+      : (logInfo?.organized ? 'Изменить логистику' : 'Организовать выезд');
     const logStripHtml = logInfo ? `
-      <div style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid ${logInfo.hasUnresolvedIncident ? '#fcd34d' : logInfo.organized ? '#86efac' : '#fde68a'};background:${logInfo.hasUnresolvedIncident ? '#fffbeb' : logInfo.organized ? '#f0fdf4' : '#fffbeb'};color:${logInfo.hasUnresolvedIncident ? '#92400e' : logInfo.organized ? '#166534' : '#92400e'};display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <span><b>✈️ Выезд (${e(logInfo.destCity)}, ${logInfo.distKm} км):</b> ${e(logInfo.summaryLine)}${logInfo.organized ? ` · Готовность ${logInfo.readinessScore}%` : ''}${logInfo.hasUnresolvedIncident ? ' · Есть дорожная накладка!' : ''}</span>
-        <button type="button" class="btn alt sm open-logistics" data-log-fid="${e(f.id)}" style="white-space:nowrap">${logInfo.organized ? 'Изменить логистику' : 'Организовать выезд'}</button>
+      <div style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid ${logLockInfo?.locked ? '#fecaca' : logInfo.hasUnresolvedIncident ? '#fcd34d' : logInfo.organized ? '#86efac' : '#fde68a'};background:${logLockInfo?.locked ? '#fef2f2' : logInfo.hasUnresolvedIncident ? '#fffbeb' : logInfo.organized ? '#f0fdf4' : '#fffbeb'};color:${logLockInfo?.locked ? '#991b1b' : logInfo.hasUnresolvedIncident ? '#92400e' : logInfo.organized ? '#166534' : '#92400e'};display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <span><b>✈️ Выезд (${e(logInfo.destCity)}, ${logInfo.distKm} км):</b> ${e(logInfo.summaryLine)}${logInfo.organized ? ` · Готовность ${logInfo.readinessScore}%` : ''}${logInfo.hasUnresolvedIncident ? ' · Есть дорожная накладка!' : ''}${logBadgeHtml}</span>
+        <button type="button" class="btn alt sm open-logistics" data-log-fid="${e(f.id)}" style="white-space:nowrap">${logBtnLabel}</button>
       </div>` : '';
     const bonusInfo = !isIntra ? (c.matchBonuses?.byFixtureId?.[f.id] || null) : null;
     const hasActiveBonus = !!(bonusInfo && (bonusInfo.teamBonus?.enabled || (bonusInfo.playerBonuses || []).length));
+    const bonusBtnStripLabel = lockInfo.locked ? '👁️ Посмотреть премиальные' : 'Изменить премиальные';
     const bonusStripHtml = hasActiveBonus ? `
       <div style="margin-top:8px;font-size:12.5px;padding:7px 12px;border-radius:7px;border:1px solid #86efac;background:#f0fdf4;color:#166534;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <span><b>💰 Премиальные на матч:</b> ${e(bonusInfo.shortSummary)}${bonusInfo.motivationLabel ? ` · ${e(bonusInfo.motivationLabel)}` : ''}</span>
-        <button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" style="white-space:nowrap">Изменить премиальные</button>
+        <button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="1" style="white-space:nowrap">${bonusBtnStripLabel}</button>
       </div>` : '';
     const openBtnLabel = lockInfo.locked
       ? (isIntra ? '👁️ Посмотреть составы и тактику (правки закрыты)' : '👁️ Посмотреть состав и тактику (правки закрыты)')
@@ -11355,12 +11607,12 @@ async function pgClub(app) {
       </div>
       ${logStripHtml}
       ${bonusStripHtml}
-      <div class="lineup-card-lock-banner" style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;${lockInfo.locked ? '' : 'display:none'}">🔒 До начала матча осталось менее 10 минут — вносить правки в состав и тактику уже нельзя.</div>
+      <div class="lineup-card-lock-banner" style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px;${lockInfo.locked ? '' : 'display:none'}">🔒 До начала матча осталось менее 10 минут — вносить правки в настройки матча (состав, тактика, премиальные) уже нельзя.</div>
       ${(f.techRisk || []).length ? `<div style="margin-top:8px;font-size:12.5px;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 12px">⚠ Перед матчем будет присуждено техническое поражение 0:3: ${f.techRisk.map(e).join('; ')}.</div>` : ''}
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn alt sm open">${openBtnLabel}</button>
-        ${!isIntra && !hasActiveBonus ? `<button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}">💰 Премиальные на матч</button>` : ''}
-        ${isIntra ? `<button type="button" class="btn sm intra-cancel" data-intra-cancel="${e(f.id)}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">Отменить спарринг</button>` : ''}
+        ${!isIntra && !hasActiveBonus ? `<button type="button" class="btn alt sm open-bonuses" data-bonus-fid="${e(f.id)}" data-has-bonus="0" ${lockInfo.locked ? 'disabled title="До начала матча осталось менее 10 минут"' : ''}>${lockInfo.locked ? '🔒 Премиальные закрыты (<10 мин)' : '💰 Премиальные на матч'}</button>` : ''}
+        ${isIntra ? `<button type="button" class="btn sm intra-cancel" data-intra-cancel="${e(f.id)}" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" ${lockInfo.locked ? 'disabled title="Отмена спарринга закрыта менее чем за 10 минут до матча"' : ''}>Отменить спарринг</button>` : ''}
       </div>
       <div class="form"></div>
     </div>`;
@@ -11377,6 +11629,8 @@ async function pgClub(app) {
       const badge = p.querySelector('[data-lock-badge]');
       const banner = p.querySelector('.lineup-card-lock-banner');
       const openBtn = p.querySelector('.open');
+      const bonusBtn = p.querySelector('.open-bonuses');
+      const intraCancelBtn = p.querySelector('.intra-cancel');
       if (li.locked) {
         if (badge) {
           badge.style.display = '';
@@ -11391,6 +11645,19 @@ async function pgClub(app) {
             ? '👁️ Посмотреть составы и тактику (правки закрыты)'
             : '👁️ Посмотреть состав и тактику (правки закрыты)';
         }
+        if (bonusBtn) {
+          if (bonusBtn.dataset.hasBonus === '1') {
+            bonusBtn.textContent = '👁️ Посмотреть премиальные';
+          } else {
+            bonusBtn.disabled = true;
+            bonusBtn.textContent = '🔒 Премиальные закрыты (<10 мин)';
+            bonusBtn.title = 'До начала матча осталось менее 10 минут';
+          }
+        }
+        if (intraCancelBtn) {
+          intraCancelBtn.disabled = true;
+          intraCancelBtn.title = 'Отмена спарринга закрыта менее чем за 10 минут до матча';
+        }
       } else if (li.remainingToLockMs > 0 && li.remainingToLockMs <= 60 * 60 * 1000) {
         if (badge) {
           badge.style.display = '';
@@ -11400,12 +11667,42 @@ async function pgClub(app) {
           badge.textContent = `⏳ правки ещё ${formatLineupLockRemaining(li.remainingToLockMs)}`;
         }
       }
+      const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
+      if (logInfo) {
+        const logLi = getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked }, nowMs);
+        const logBadge = p.querySelector('[data-log-lock-badge]');
+        const logBtn = p.querySelector('.open-logistics');
+        if (logLi.locked) {
+          if (logBadge) {
+            logBadge.style.display = '';
+            logBadge.style.background = '#fef2f2';
+            logBadge.style.color = '#991b1b';
+            logBadge.style.borderColor = '#fca5a5';
+            logBadge.textContent = '🔒 логистика закрыта (<1 ч)';
+          }
+          if (logBtn) logBtn.textContent = '👁️ Посмотреть логистику (закрыто <1 ч)';
+        } else if (logLi.remainingToLockMs > 0 && logLi.remainingToLockMs <= 3 * 60 * 60 * 1000) {
+          if (logBadge) {
+            logBadge.style.display = '';
+            logBadge.style.background = '#fffbeb';
+            logBadge.style.color = '#b45309';
+            logBadge.style.borderColor = '#fcd34d';
+            logBadge.textContent = `⏳ выезд ещё ${formatLineupLockRemaining(logLi.remainingToLockMs)}`;
+          }
+        }
+      }
     });
     return true;
   };
   if (upcomingSorted.some(f => {
     const li = getClientLineupLockInfo(f);
-    return !li.locked && Number.isFinite(li.remainingToLockMs) && li.remainingToLockMs <= 24 * 60 * 60 * 1000;
+    if (!li.locked && Number.isFinite(li.remainingToLockMs) && li.remainingToLockMs <= 24 * 60 * 60 * 1000) return true;
+    const logInfo = c.awayLogistics?.byFixtureId?.[f.id] || null;
+    if (logInfo) {
+      const logLi = getClientLogisticsLockInfo({ ...f, logisticsLockAt: logInfo.logisticsLockAt, logisticsLocked: logInfo.logisticsLocked });
+      if (!logLi.locked && Number.isFinite(logLi.remainingToLockMs) && logLi.remainingToLockMs <= 24 * 60 * 60 * 1000) return true;
+    }
+    return false;
   })) {
     const lockTick = setInterval(() => {
       if (!updateCardLockBadges()) clearInterval(lockTick);
@@ -11426,6 +11723,11 @@ async function pgClub(app) {
     });
     p.querySelector('.open-bonuses')?.addEventListener('click', async () => {
       if (!f) return;
+      const bonusBtn = p.querySelector('.open-bonuses');
+      if (getClientLineupLockInfo(f).locked && bonusBtn?.dataset.hasBonus !== '1') {
+        updateCardLockBadges();
+        return toast('До начала матча осталось менее 10 минут — назначить премиальные уже нельзя', 1);
+      }
       try {
         const mod = await ensureBonuses();
         mod.openBonusModal({
@@ -11442,6 +11744,10 @@ async function pgClub(app) {
       }
     });
     p.querySelector('.intra-cancel')?.addEventListener('click', () => {
+      if (getClientLineupLockInfo(f).locked) {
+        updateCardLockBadges();
+        return toast('До начала матча осталось менее 10 минут — отменить спарринг уже нельзя', 1);
+      }
       confirmModal({
         title: 'Отмена спарринга',
         msg: `Отменить внутрикомандный спарринг «${f.homeName} — ${f.awayName}» (${fmtD(f.gameDate || f.date)})?`,
@@ -11833,6 +12139,7 @@ function lineupForm(box, f, c, withT, app) {
     return sum === 10;
   };
 
+  let bonusEditorApi = null;
   const isLineupLocked = () => getClientLineupLockInfo(f).locked;
   const applyLineupLockUi = () => {
     const locked = isLineupLocked();
@@ -11841,14 +12148,15 @@ function lineupForm(box, f, c, withT, app) {
     const deadlineNote = box.querySelector('.lineup-deadline-note');
     if (deadlineNote) {
       deadlineNote.textContent = locked
-        ? '🔒 До начала матча осталось менее 10 минут — вносить правки в состав и тактику уже нельзя.'
-        : 'Состав и тактику можно менять не позднее чем за 10 минут до начала матча.';
+        ? '🔒 До начала матча осталось менее 10 минут — вносить правки в настройки матча уже нельзя.'
+        : 'Состав, тактику и премиальные на матч можно менять не позднее чем за 10 минут до начала матча.';
       deadlineNote.style.color = locked ? '#991b1b' : '';
     }
     if (!locked) return;
     box.querySelectorAll('.fm, select[data-p], .reset-lineup-btn, #slots_editor select, #slots_editor button, #subs_editor input, #subs_editor select, #subs_editor button, #roles_editor select, .tactic-preset-sel, .apply-tactic-preset-btn, .tc1, .sp1, .tr1, .clear-tactics-btn, .clear-speech-btn, .clear-training-btn, .save').forEach(el => {
       el.disabled = true;
     });
+    if (bonusEditorApi?.applyLockUi) bonusEditorApi.applyLockUi();
     const saveBtn = box.querySelector('.save');
     if (saveBtn) saveBtn.title = 'Редактирование закрыто менее чем за 10 минут до матча';
   };
@@ -12299,7 +12607,6 @@ function lineupForm(box, f, c, withT, app) {
     toast('Состав сброшен — выберите игроков заново');
   });
 
-  let bonusEditorApi = null;
   const bonusMount = box.querySelector('#bonuses_editor_mount');
   if (bonusMount) {
     ensureBonuses().then(m => {
@@ -12311,6 +12618,8 @@ function lineupForm(box, f, c, withT, app) {
         startersSet: new Set(sPids),
         benchSet: new Set(bPids)
       });
+      bonusEditorApi?.applyLockUi?.();
+      applyLineupLockUi();
     }).catch(() => {});
   }
 

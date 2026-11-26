@@ -77,12 +77,42 @@ export interface MatchBonusContext {
   squadOf: (tid: string) => any[];
   loanPoolFor: (tid: string, f: any) => any[];
   fx: (id: string) => any;
+  realAt: (f: any) => Date;
   isIntraSquad: (f: any) => boolean;
   compName: (id: string) => string;
   needClub: any;
   fail: (res: Response, msg: string, code?: number) => void;
   uid: () => string;
   tg: (text: string) => void;
+}
+
+export const MATCH_BONUS_LOCK_BEFORE_MS = 10 * 60 * 1000;
+
+export function getMatchBonusLockInfo(ctx: MatchBonusContext, f: any, nowMs = Date.now()) {
+  if (!f || f.status !== "scheduled") {
+    const kMs = f && ctx.realAt ? ctx.realAt(f).getTime() : NaN;
+    const kickoffAt = Number.isFinite(kMs) ? kMs : null;
+    const lockAt = kickoffAt !== null ? kickoffAt - MATCH_BONUS_LOCK_BEFORE_MS : null;
+    return { kickoffAt, lockAt, locked: true, reason: "status" as const, remainingMs: 0 };
+  }
+  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim());
+  if (!hasExplicitDate || !ctx.realAt) {
+    return { kickoffAt: null as number | null, lockAt: null as number | null, locked: false, reason: null, remainingMs: Infinity };
+  }
+  const kickoffMs = ctx.realAt(f).getTime();
+  if (!Number.isFinite(kickoffMs)) {
+    return { kickoffAt: null as number | null, lockAt: null as number | null, locked: false, reason: null, remainingMs: Infinity };
+  }
+  const lockAt = kickoffMs - MATCH_BONUS_LOCK_BEFORE_MS;
+  const remainingMs = Math.max(0, lockAt - nowMs);
+  const locked = nowMs >= lockAt;
+  return {
+    kickoffAt: kickoffMs,
+    lockAt,
+    locked,
+    reason: locked ? ("time" as const) : null,
+    remainingMs,
+  };
 }
 
 export const TEAM_BONUS_CONDITIONS: Array<{
@@ -442,6 +472,9 @@ export function saveMatchBonusRecord(
   if (f.status !== "scheduled") {
     return { ok: false, error: "Матч уже начался или завершён — изменить премиальные нельзя" };
   }
+  if (getMatchBonusLockInfo(ctx, f).locked) {
+    return { ok: false, error: "До начала матча осталось менее 10 минут — изменить премиальные на матч уже нельзя" };
+  }
   if (ctx.isIntraSquad(f)) {
     return { ok: false, error: "Для внутрикомандного спарринга премиальные не назначаются" };
   }
@@ -796,12 +829,15 @@ export function getClubMatchBonusesSummary(ctx: MatchBonusContext, tid: string) 
     const f = ctx.fx(rec.fixtureId);
     if (!rec.settled && f && f.status === "scheduled") {
       const impact = buildMatchBonusImpact(ctx, f, tid);
+      const lockInfo = getMatchBonusLockInfo(ctx, f);
       byFixtureId[rec.fixtureId] = {
         ...rec,
         motivationScore: impact.motivationScore,
         motivationLevel: impact.motivationLevel,
         motivationLabel: impact.motivationLabel,
         shortSummary: impact.shortSummary,
+        bonusLockAt: lockInfo.lockAt,
+        bonusLocked: lockInfo.locked,
       };
       committedTotal += Math.max(0, Number(rec.maxPotentialPayout || 0));
     } else if (rec.settled) {

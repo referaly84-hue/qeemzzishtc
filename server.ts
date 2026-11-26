@@ -102,6 +102,7 @@ import {
   type AdServerContext,
 } from "./server_ads_predictions.ts";
 import {
+  getAwayLogisticsLockInfo,
   getAwayLogisticsMatchImpact,
   getClubAwayFixturesSummary,
   isAwayOrTravelFixture,
@@ -17488,7 +17489,7 @@ function getFixtureLineupLockInfo(f: any, nowMs = Date.now()) {
     const lockAt = kickoffAt !== null ? kickoffAt - LINEUP_LOCK_BEFORE_MS : null;
     return { kickoffAt, lockAt, locked: true, reason: "status" as const, remainingMs: 0 };
   }
-  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || f.date || "").trim());
+  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim());
   if (!hasExplicitDate) {
     return { kickoffAt: null as number | null, lockAt: null as number | null, locked: false, reason: null, remainingMs: Infinity };
   }
@@ -18758,6 +18759,7 @@ var pubFx = (f) => {
     gameTime: f.gameTime || f.time,
     realDate: f.realDate || f.date,
     realTime: f.realTime || f.time,
+    hasRealSchedule: /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim()),
     realStartAt: realAt(f).getTime(),
     lineupLockAt: getFixtureLineupLockInfo(f).lockAt,
     lineupLocked: getFixtureLineupLockInfo(f).locked,
@@ -18828,6 +18830,53 @@ app.post("/api/logout", (req, res) => {
   }
   res.json({ ok: 1 });
 });
+function getClubMatchLocksForState(req: any) {
+  if (!req.me) return [];
+  const requested = String(req.query?.teamId || "").trim();
+  let tid = "";
+  if (req.me.role === "club") {
+    tid = requested && canManageClubId(req.me, requested) ? requested : (req.me.teamId || "");
+  } else if (req.me.role === "admin" && requested && team(requested)) {
+    tid = requested;
+  }
+  if (!tid || !team(tid)) return [];
+  const now = Date.now();
+  const curS = S();
+  const logCtx = getLogisticsCtx();
+  return (db.fixtures || [])
+    .filter((f: any) => (!f.season || f.season === curS) && f.status === "scheduled" && (f.home === tid || f.away === tid))
+    .map((f: any) => {
+      const lineupLock = getFixtureLineupLockInfo(f, now);
+      if (lineupLock.kickoffAt === null || lineupLock.lockAt === null) return null;
+      if (now > lineupLock.kickoffAt + 60 * 1000) return null;
+      const geo = isAwayOrTravelFixture(logCtx, f, tid);
+      const logLock = geo.needsTravel ? getAwayLogisticsLockInfo(logCtx, f, now) : null;
+      const intra = isIntraSquad(f);
+      const oppId = f.home === tid ? f.away : f.home;
+      const oppName = intra ? `${f.homeLabel || "Основа"} — ${f.awayLabel || "Запас"}` : tn(oppId);
+      const lineupSubmitted = intra
+        ? !!(db.lineups?.[lineupKey(f, tid, "home")] && db.lineups?.[lineupKey(f, tid, "away")])
+        : !!db.lineups?.[f.id + ":" + tid];
+      return {
+        fid: f.id,
+        teamId: tid,
+        label: roundLabel(f),
+        oppName,
+        home: f.home === tid,
+        intraSquad: intra,
+        realDate: f.realDate,
+        realTime: f.realTime || f.time || "12:00",
+        kickoffAt: lineupLock.kickoffAt,
+        lineupLockAt: lineupLock.lockAt,
+        logisticsLockAt: logLock?.lockAt ?? null,
+        needsTravel: !!geo.needsTravel,
+        lineupSubmitted,
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => a.kickoffAt - b.kickoffAt)
+    .slice(0, 8);
+}
 app.get("/api/state", (req, res) => {
   res.json({
     season: S(),
@@ -18851,6 +18900,7 @@ app.get("/api/state", (req, res) => {
     unreadNotificationsCount: (req.me?.role === "club" && req.me.teamId)
       ? (Array.isArray(db.clubNotifications) ? db.clubNotifications : []).filter((n) => n.teamId === req.me.teamId && !n.read).length
       : 0,
+    clubMatchLocks: getClubMatchLocksForState(req),
     hasLLM: hasLLM(),
     live: db.fixtures.filter((f) => f.status === "live").map(pubFx),
     liveDraw: {
@@ -28695,6 +28745,9 @@ app.post("/api/club/friendly/intra/cancel", needClub, (req, res) => {
   );
   if (!f) return fail(res, "Запланированный спарринг не найден");
   if (f.status !== "scheduled") return fail(res, "Нельзя отменить матч, который уже начался или завершён");
+  if (getFixtureLineupLockInfo(f).locked) {
+    return fail(res, "До начала матча осталось менее 10 минут — отменить спарринг уже нельзя");
+  }
   db.fixtures = (db.fixtures || []).filter((x) => x.id !== f.id);
   if (db.lineups) {
     delete db.lineups[lineupKey(f, req.tid, "home")];
@@ -31025,6 +31078,7 @@ function getBonusesCtx(): MatchBonusContext {
     squadOf,
     loanPoolFor,
     fx,
+    realAt,
     isIntraSquad,
     compName: (id: string) => db.comps?.find((c: any) => c.id === id)?.name || id,
     needClub,

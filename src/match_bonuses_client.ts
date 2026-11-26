@@ -12,10 +12,13 @@ declare global {
           startersSet?: Set<string>;
           benchSet?: Set<string>;
           onChange?: () => void;
+          onLockChange?: () => void;
         }
       ) => {
         getPayload: () => any;
         updateSets: (starters: string[], bench: string[]) => void;
+        applyLockUi: () => void;
+        isLocked: () => boolean;
       };
       openBonusModal: (opts: {
         fixture: any;
@@ -120,7 +123,78 @@ function ensureBonusStyles() {
       background:#fff;border-radius:14px;max-width:780px;width:100%;max-height:90vh;overflow-y:auto;
       padding:18px 20px;box-shadow:0 24px 60px rgba(0,0,0,.28);border:1px solid var(--line);
     }
+    .mb-lock-banner{
+      margin:8px 0 4px;
+      padding:8px 12px;
+      border-radius:8px;
+      border:1px solid #fecaca;
+      background:#fef2f2;
+      color:#991b1b;
+      font-size:12.5px;
+      font-weight:600;
+    }
   `;
+}
+
+const MATCH_BONUS_LOCK_BEFORE_MS = 10 * 60 * 1000;
+
+function getClientBonusLockInfo(f: any, nowMs = Date.now()) {
+  if (!f || (f.status && f.status !== "scheduled")) {
+    return {
+      locked: true,
+      lockAt: f?.lineupLockAt ?? null,
+      kickoffAt: f?.realStartAt ?? null,
+      remainingToLockMs: 0,
+    };
+  }
+  if (f?.hasRealSchedule === false) {
+    return {
+      locked: false,
+      lockAt: null,
+      kickoffAt: null,
+      remainingToLockMs: Infinity,
+    };
+  }
+  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim());
+  if (!hasExplicitDate && !Number.isFinite(f?.lineupLockAt)) {
+    return {
+      locked: !!f?.lineupLocked,
+      lockAt: null,
+      kickoffAt: null,
+      remainingToLockMs: Infinity,
+    };
+  }
+  let kickoffAt: number | null = null;
+  if (hasExplicitDate) {
+    const rd = String(f.realDate).trim();
+    const rt = String(f?.realTime || f?.time || "12:00").trim();
+    const m = rt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    const hhmmss = m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] || "00"}` : "12:00:00";
+    const parsed = Date.parse(`${rd}T${hhmmss}+03:00`);
+    if (Number.isFinite(parsed)) kickoffAt = parsed;
+  } else if (Number.isFinite(f?.realStartAt)) {
+    kickoffAt = Number(f.realStartAt);
+  }
+  const lockAt = Number.isFinite(f?.lineupLockAt)
+    ? Number(f.lineupLockAt)
+    : kickoffAt !== null
+      ? kickoffAt - MATCH_BONUS_LOCK_BEFORE_MS
+      : null;
+  if (lockAt === null) {
+    return {
+      locked: !!f?.lineupLocked,
+      lockAt: null,
+      kickoffAt,
+      remainingToLockMs: Infinity,
+    };
+  }
+  const locked = !!f?.lineupLocked || nowMs >= lockAt;
+  return {
+    locked,
+    lockAt,
+    kickoffAt,
+    remainingToLockMs: Math.max(0, lockAt - nowMs),
+  };
 }
 
 const DEFAULT_TEAM_CONDS = [
@@ -186,10 +260,12 @@ function mountBonusEditor(
     startersSet?: Set<string>;
     benchSet?: Set<string>;
     onChange?: () => void;
+    onLockChange?: () => void;
   }
 ) {
   ensureBonusStyles();
   const f = opts.fixture;
+  const isLocked = () => getClientBonusLockInfo(f).locked;
   const c = opts.clubData || {};
   const bonusMeta = c.matchBonuses || {};
   const existing = bonusMeta.byFixtureId?.[f.id] || null;
@@ -355,8 +431,9 @@ function mountBonusEditor(
           </div>
         </div>
         <div class="muted small" style="line-height:1.45">
-          Обещанные премиальные передаются напрямую в сценарий матча (ИИ-промпт) и повышают боевую мотивацию команды и выбранных игроков. Средства списываются <b>только после финального свистка</b> и только если условие выполнено.
+          Обещанные премиальные передаются напрямую в сценарий матча (ИИ-промпт) и повышают боевую мотивацию команды и выбранных игроков. Средства списываются <b>только после финального свистка</b> и только если условие выполнено. <span id="mb_unlock_note">Настройка доступна не позднее чем за 10 минут до начала матча.</span>
         </div>
+        <div id="mb_lock_banner" class="mb-lock-banner" style="display:none">🔒 До начала матча осталось менее 10 минут — настройка и изменение премиальных на матч уже закрыты.</div>
 
         <div class="mb-subcard">
           <label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-weight:700;font-size:13px">
@@ -397,6 +474,22 @@ function mountBonusEditor(
       </div>
     `;
 
+    const applyLockUi = () => {
+      const locked = isLocked();
+      const banner = container.querySelector("#mb_lock_banner") as HTMLElement | null;
+      if (banner) banner.style.display = locked ? "" : "none";
+      const note = container.querySelector("#mb_unlock_note") as HTMLElement | null;
+      if (note) note.style.display = locked ? "none" : "";
+      if (!locked) return;
+      container
+        .querySelectorAll(
+          "#mb_team_enabled, #mb_team_cond, #mb_team_amt, #mb_team_note, .mb-team-chip, #mb_add_player, .mb-p-sel, .mb-p-cond, .mb-p-amt, .mb-p-chip, .mb-p-note, .mb-p-del"
+        )
+        .forEach((el: any) => {
+          el.disabled = true;
+        });
+    };
+
     const notifyChange = () => {
       renderSummaryOnly();
       if (opts.onChange) opts.onChange();
@@ -404,6 +497,11 @@ function mountBonusEditor(
 
     const chk = container.querySelector("#mb_team_enabled") as HTMLInputElement | null;
     chk?.addEventListener("change", () => {
+      if (isLocked()) {
+        chk.checked = state.teamEnabled;
+        applyLockUi();
+        return;
+      }
       state.teamEnabled = !!chk.checked;
       const tf = container.querySelector("#mb_team_fields") as HTMLElement | null;
       if (tf) tf.style.display = state.teamEnabled ? "" : "none";
@@ -412,12 +510,22 @@ function mountBonusEditor(
 
     const tCond = container.querySelector("#mb_team_cond") as HTMLSelectElement | null;
     tCond?.addEventListener("change", () => {
+      if (isLocked()) {
+        tCond.value = state.teamCondition;
+        applyLockUi();
+        return;
+      }
       state.teamCondition = tCond.value;
       notifyChange();
     });
 
     const tAmt = container.querySelector("#mb_team_amt") as HTMLInputElement | null;
     tAmt?.addEventListener("input", () => {
+      if (isLocked()) {
+        tAmt.value = String(state.teamAmount);
+        applyLockUi();
+        return;
+      }
       state.teamAmount = Math.max(0, Math.round(Number(tAmt.value || 0)));
       container.querySelectorAll(".mb-team-chip").forEach((b: any) => {
         b.classList.toggle("on", Number(b.dataset.val) === state.teamAmount);
@@ -427,6 +535,10 @@ function mountBonusEditor(
 
     container.querySelectorAll(".mb-team-chip").forEach((btn: any) => {
       btn.addEventListener("click", () => {
+        if (isLocked()) {
+          applyLockUi();
+          return;
+        }
         state.teamAmount = Number(btn.dataset.val || 0);
         if (!state.teamEnabled) {
           state.teamEnabled = true;
@@ -444,11 +556,20 @@ function mountBonusEditor(
 
     const tNote = container.querySelector("#mb_team_note") as HTMLInputElement | null;
     tNote?.addEventListener("input", () => {
+      if (isLocked()) {
+        tNote.value = state.motivationNote;
+        applyLockUi();
+        return;
+      }
       state.motivationNote = tNote.value;
       notifyChange();
     });
 
     container.querySelector("#mb_add_player")?.addEventListener("click", () => {
+      if (isLocked()) {
+        applyLockUi();
+        return;
+      }
       if (state.playerBonuses.length >= 6) return;
       const usedPids = new Set(state.playerBonuses.map((x: any) => x.playerId));
       const candidate =
@@ -469,6 +590,11 @@ function mountBonusEditor(
     container.querySelectorAll(".mb-p-sel").forEach((sel: any) => {
       sel.addEventListener("change", () => {
         const idx = Number(sel.dataset.pidx);
+        if (isLocked()) {
+          if (state.playerBonuses[idx]) sel.value = state.playerBonuses[idx].playerId || "";
+          applyLockUi();
+          return;
+        }
         if (state.playerBonuses[idx]) {
           state.playerBonuses[idx].playerId = sel.value;
           const pObj = playerById.get(sel.value);
@@ -484,6 +610,11 @@ function mountBonusEditor(
     container.querySelectorAll(".mb-p-cond").forEach((sel: any) => {
       sel.addEventListener("change", () => {
         const idx = Number(sel.dataset.pidx);
+        if (isLocked()) {
+          if (state.playerBonuses[idx]) sel.value = state.playerBonuses[idx].condition || "goal";
+          applyLockUi();
+          return;
+        }
         if (state.playerBonuses[idx]) state.playerBonuses[idx].condition = sel.value;
         notifyChange();
       });
@@ -492,6 +623,11 @@ function mountBonusEditor(
     container.querySelectorAll(".mb-p-amt").forEach((inp: any) => {
       inp.addEventListener("input", () => {
         const idx = Number(inp.dataset.pidx);
+        if (isLocked()) {
+          if (state.playerBonuses[idx]) inp.value = String(state.playerBonuses[idx].amount || 0);
+          applyLockUi();
+          return;
+        }
         const val = Math.max(0, Math.round(Number(inp.value || 0)));
         if (state.playerBonuses[idx]) state.playerBonuses[idx].amount = val;
         container.querySelectorAll(`.mb-p-chip[data-pidx="${idx}"]`).forEach((b: any) => {
@@ -503,6 +639,10 @@ function mountBonusEditor(
 
     container.querySelectorAll(".mb-p-chip").forEach((btn: any) => {
       btn.addEventListener("click", () => {
+        if (isLocked()) {
+          applyLockUi();
+          return;
+        }
         const idx = Number(btn.dataset.pidx);
         const val = Number(btn.dataset.val || 0);
         if (state.playerBonuses[idx]) state.playerBonuses[idx].amount = val;
@@ -518,6 +658,11 @@ function mountBonusEditor(
     container.querySelectorAll(".mb-p-note").forEach((inp: any) => {
       inp.addEventListener("input", () => {
         const idx = Number(inp.dataset.pidx);
+        if (isLocked()) {
+          if (state.playerBonuses[idx]) inp.value = state.playerBonuses[idx].note || "";
+          applyLockUi();
+          return;
+        }
         if (state.playerBonuses[idx]) state.playerBonuses[idx].note = inp.value;
         notifyChange();
       });
@@ -525,6 +670,10 @@ function mountBonusEditor(
 
     container.querySelectorAll(".mb-p-del").forEach((btn: any) => {
       btn.addEventListener("click", () => {
+        if (isLocked()) {
+          applyLockUi();
+          return;
+        }
         const idx = Number(btn.dataset.pidx);
         state.playerBonuses.splice(idx, 1);
         render();
@@ -533,9 +682,32 @@ function mountBonusEditor(
     });
 
     renderSummaryOnly();
+    applyLockUi();
   };
 
   render();
+
+  const initialLock = getClientBonusLockInfo(f);
+  if (!initialLock.locked && Number.isFinite(initialLock.remainingToLockMs) && initialLock.remainingToLockMs <= 24 * 60 * 60 * 1000) {
+    setTimeout(() => {
+      if (container.isConnected) {
+        const banner = container.querySelector("#mb_lock_banner") as HTMLElement | null;
+        if (banner) banner.style.display = isLocked() ? "" : "none";
+        const note = container.querySelector("#mb_unlock_note") as HTMLElement | null;
+        if (note) note.style.display = isLocked() ? "none" : "";
+        if (isLocked()) {
+          container
+            .querySelectorAll(
+              "#mb_team_enabled, #mb_team_cond, #mb_team_amt, #mb_team_note, .mb-team-chip, #mb_add_player, .mb-p-sel, .mb-p-cond, .mb-p-amt, .mb-p-chip, .mb-p-note, .mb-p-del"
+            )
+            .forEach((el: any) => {
+              el.disabled = true;
+            });
+          if (opts.onLockChange) opts.onLockChange();
+        }
+      }
+    }, initialLock.remainingToLockMs + 250);
+  }
 
   return {
     getPayload,
@@ -544,6 +716,22 @@ function mountBonusEditor(
       benchSet = new Set(nextBench || []);
       renderSummaryOnly();
     },
+    applyLockUi: () => {
+      if (isLocked()) {
+        const banner = container.querySelector("#mb_lock_banner") as HTMLElement | null;
+        if (banner) banner.style.display = "";
+        const note = container.querySelector("#mb_unlock_note") as HTMLElement | null;
+        if (note) note.style.display = "none";
+        container
+          .querySelectorAll(
+            "#mb_team_enabled, #mb_team_cond, #mb_team_amt, #mb_team_note, .mb-team-chip, #mb_add_player, .mb-p-sel, .mb-p-cond, .mb-p-amt, .mb-p-chip, .mb-p-note, .mb-p-del"
+          )
+          .forEach((el: any) => {
+            el.disabled = true;
+          });
+      }
+    },
+    isLocked,
   };
 }
 
@@ -589,13 +777,28 @@ function openBonusModal(opts: {
   `;
   document.body.appendChild(backdrop);
 
+  const syncModalLock = () => {
+    const locked = getClientBonusLockInfo(f).locked;
+    const clearBtn = backdrop.querySelector("#mb_modal_clear") as HTMLButtonElement | null;
+    const saveBtn = backdrop.querySelector("#mb_modal_save") as HTMLButtonElement | null;
+    if (clearBtn) clearBtn.disabled = locked;
+    if (saveBtn) {
+      saveBtn.disabled = locked;
+      saveBtn.textContent = locked ? "🔒 Правки закрыты (<10 мин)" : "Сохранить премиальные";
+      saveBtn.title = locked ? "Редактирование премиальных закрыто менее чем за 10 минут до матча" : "";
+    }
+  };
+
   const editor = mountBonusEditor(backdrop.querySelector("#mb_modal_body") as HTMLElement, {
     fixture: f,
     clubData: c,
     players,
     startersSet: stSet,
     benchSet: bnSet,
+    onLockChange: syncModalLock,
   });
+
+  syncModalLock();
 
   const close = () => backdrop.remove();
   backdrop.addEventListener("click", (ev) => {
@@ -605,6 +808,12 @@ function openBonusModal(opts: {
   backdrop.querySelector("#mb_modal_cancel")?.addEventListener("click", close);
 
   backdrop.querySelector("#mb_modal_clear")?.addEventListener("click", async () => {
+    if (getClientBonusLockInfo(f).locked) {
+      syncModalLock();
+      editor.applyLockUi();
+      opts.toast("До начала матча осталось менее 10 минут — изменить премиальные на матч уже нельзя", 1);
+      return;
+    }
     const r = await opts.act(
       () => opts.api("/club/match-bonuses", opts.withT({ fid: f.id, clear: true })),
       "Премиальные отменены"
@@ -616,6 +825,12 @@ function openBonusModal(opts: {
   });
 
   backdrop.querySelector("#mb_modal_save")?.addEventListener("click", async () => {
+    if (getClientBonusLockInfo(f).locked) {
+      syncModalLock();
+      editor.applyLockUi();
+      opts.toast("До начала матча осталось менее 10 минут — изменить премиальные на матч уже нельзя", 1);
+      return;
+    }
     const payload = editor.getPayload();
     const r = await opts.act(
       () => opts.api("/club/match-bonuses", opts.withT({ fid: f.id, ...payload })),

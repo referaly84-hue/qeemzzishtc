@@ -18,6 +18,35 @@ export interface AwayLogisticsServerContext {
   compName: (id: string) => string;
 }
 
+export const AWAY_LOGISTICS_LOCK_BEFORE_MS = 60 * 60 * 1000;
+
+export function getAwayLogisticsLockInfo(ctx: AwayLogisticsServerContext, f: any, nowMs = Date.now()) {
+  if (!f || f.status !== "scheduled") {
+    const kMs = f ? ctx.realAt(f).getTime() : NaN;
+    const kickoffAt = Number.isFinite(kMs) ? kMs : null;
+    const lockAt = kickoffAt !== null ? kickoffAt - AWAY_LOGISTICS_LOCK_BEFORE_MS : null;
+    return { kickoffAt, lockAt, locked: true, reason: "status" as const, remainingMs: 0 };
+  }
+  const hasExplicitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(f.realDate || "").trim());
+  if (!hasExplicitDate) {
+    return { kickoffAt: null as number | null, lockAt: null as number | null, locked: false, reason: null, remainingMs: Infinity };
+  }
+  const kickoffMs = ctx.realAt(f).getTime();
+  if (!Number.isFinite(kickoffMs)) {
+    return { kickoffAt: null as number | null, lockAt: null as number | null, locked: false, reason: null, remainingMs: Infinity };
+  }
+  const lockAt = kickoffMs - AWAY_LOGISTICS_LOCK_BEFORE_MS;
+  const remainingMs = Math.max(0, lockAt - nowMs);
+  const locked = nowMs >= lockAt;
+  return {
+    kickoffAt: kickoffMs,
+    lockAt,
+    locked,
+    reason: locked ? ("time" as const) : null,
+    remainingMs,
+  };
+}
+
 export type TransportModeId =
   | "local_bus"
   | "local_camp"
@@ -1239,6 +1268,7 @@ export function getClubAwayFixturesSummary(ctx: AwayLogisticsServerContext, tid:
         (!Array.isArray(db.settings?.techDefeatComps) ||
           db.settings.techDefeatComps.includes(tdKey) ||
           (compRaw === "cup" && db.settings.techDefeatComps.includes("cup")));
+      const lockInfo = getAwayLogisticsLockInfo(ctx, f);
       return {
         fixtureId: f.id,
         role: geo.role,
@@ -1250,6 +1280,9 @@ export function getClubAwayFixturesSummary(ctx: AwayLogisticsServerContext, tid:
         readinessScore: rec?.readinessScore ?? (geo.distKm < 70 ? 64 : 46),
         summaryLine: rec?.summaryLine || (tdForComp ? "Выезд не организован — неявка, ТН 0:3 и штраф КДК" : "Выезд не организован (для этой лиги Авто-ТН выключен)"),
         hasUnresolvedIncident: !!(rec?.incident && !rec.incident.resolved),
+        hasRealSchedule: lockInfo.kickoffAt !== null,
+        logisticsLockAt: lockInfo.lockAt,
+        logisticsLocked: lockInfo.locked,
       };
     })
     .filter(Boolean);
@@ -1299,6 +1332,7 @@ export function registerAwayLogisticsRoutes(app: Express, ctx: AwayLogisticsServ
             }
           : evaluateLogisticsPlan(catalog, defaultSelection, null);
 
+        const lockInfo = getAwayLogisticsLockInfo(ctx, f);
         return {
           fixture: {
             ...ctx.pubFx(f),
@@ -1306,10 +1340,14 @@ export function registerAwayLogisticsRoutes(app: Express, ctx: AwayLogisticsServ
             oppName: ctx.tn(oppId),
             oppLogo: ctx.teamLogo(oppId),
             compName: ctx.compName(f.comp),
+            logisticsLockAt: lockInfo.lockAt,
+            logisticsLocked: lockInfo.locked,
           },
           role: geo.role,
           catalog,
           organized: !!(saved && saved.confirmedAt),
+          logisticsLockAt: lockInfo.lockAt,
+          logisticsLocked: lockInfo.locked,
           saved,
           defaultSelection,
           preview,
@@ -1351,6 +1389,9 @@ export function registerAwayLogisticsRoutes(app: Express, ctx: AwayLogisticsServ
     const f = ctx.fx(fixtureId);
     if (!f) return ctx.fail(res, "Матч не найден", 404);
     if (f.status !== "scheduled") return ctx.fail(res, "Матч уже начался или завершён — изменить выезд нельзя", 400);
+    if (getAwayLogisticsLockInfo(ctx, f).locked) {
+      return ctx.fail(res, "До начала матча осталось менее 1 часа — оформить или изменить выездную логистику уже нельзя", 400);
+    }
 
     const geo = isAwayOrTravelFixture(ctx, f, tid);
     if (!geo.needsTravel) return ctx.fail(res, "Этот матч проходит дома — организация выезда не требуется", 400);
@@ -1468,6 +1509,9 @@ export function registerAwayLogisticsRoutes(app: Express, ctx: AwayLogisticsServ
     const f = ctx.fx(fixtureId);
     if (!f) return ctx.fail(res, "Матч не найден", 404);
     if (f.status !== "scheduled") return ctx.fail(res, "Матч уже начался или завершён", 400);
+    if (getAwayLogisticsLockInfo(ctx, f).locked) {
+      return ctx.fail(res, "До начала матча осталось менее 1 часа — устранить дорожную накладку уже нельзя", 400);
+    }
 
     const key = `${f.id}:${tid}`;
     const rec: AwayLogisticsRecord | undefined = db.awayLogistics[key];
